@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "figma.figma-vscode-extension",
+    "github.vscode-pull-request-github",
+    "anthropic.claude-code",
+    "editorconfig.editorconfig"
+  ]
+}
