@@ -15,3 +15,8 @@ Smart note-taking ("flowing") app for parliamentary debate tournaments.
 ## Workflow
 - Development branch: `claude/admiring-heisenberg-dhraiy`.
 - Designs live in Figma file `TJHHaf0ew3Yl9pHjVkJAxQ`.
+
+## Design
+- Chosen direction: **Clean SaaS** (Direction 1) from the Figma file
+  `AlPJWa4eWeuptbigOL3QS3` ("Debate Flow — Design Exploration", page "D1 · Clean SaaS").
+- Follow `docs/design.md` for colors, type, layout and the green / red / neutral status logic.

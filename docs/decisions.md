@@ -1,3 +1,7 @@
+# Decided
+
+- **Visual design** (2026-11-10): Direction 1 · Clean SaaS. See `docs/design.md`.
+
 # Open decisions
 
 1. **Platform**: web app (PWA, works offline in rounds), desktop, or mobile/tablet?
