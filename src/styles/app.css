@@ -1582,12 +1582,21 @@ button.chip--alert:hover {
 }
 
 /* ---------- Tablet / narrow ---------- */
+@media (max-width: 1280px) {
+  .side-pill__detail {
+    display: none;
+  }
+}
+
 @media (max-width: 1100px) {
   .topbar {
     gap: 10px;
     padding: 0 12px;
   }
   .side-pill__rest .side-pill__partner-name {
+    display: none;
+  }
+  .invite__hint {
     display: none;
   }
   .stagebar {
@@ -1597,6 +1606,9 @@ button.chip--alert:hover {
 }
 
 @media (pointer: coarse) {
+  .gap__btn {
+    opacity: 0.35;
+  }
   .tool {
     min-width: 32px;
     height: 30px;

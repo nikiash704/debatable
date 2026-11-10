@@ -416,3 +416,47 @@ test("criterion 10: a different format config changes stages and columns (no cod
   await goStage(page, "NSUM");
   await expect(card(page, "NP1")).toHaveAttribute("data-red", "true");
 });
+
+test("touch: on a tablet the main actions work by tapping", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await expect(page.getByTestId("room")).toBeVisible();
+  if (await page.getByTestId("setup-panel").isVisible()) await page.getByTestId("setup-close").tap();
+  // empty board area between two lanes (tapping it ends editing and clears the selection)
+  const background = () => page.getByTestId("board").tap({ position: { x: 976, y: 400 } });
+  // create and type, tap away to finish
+  await page.getByTestId("add-LOC-clash").tap();
+  await page.keyboard.type("Unexplored is not more valuable");
+  await background();
+  await expect(card(page, "OC1")).toContainText("Unexplored is not more valuable");
+  // stages by tapping
+  await page.getByTestId("stage-next").tap();
+  await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "PMC");
+  await page.getByTestId("add-PMC-own").tap();
+  await page.keyboard.type("Oceans are 95% unexplored");
+  await background();
+  // tap selects; the card toolbar is then there for touch
+  await card(page, "PM1").tap();
+  await expect(card(page, "PM1")).toHaveClass(/card--selected/);
+  await card(page, "PM1").getByTestId("tool-strong").tap();
+  await expect(card(page, "PM1").getByTestId("card-strong")).toBeVisible();
+  await card(page, "PM1").getByTestId("tool-tags").tap();
+  await page.getByTestId("menu-tag-no-warrant").tap();
+  await expect(card(page, "PM1").getByTestId("tag-no-warrant")).toBeVisible();
+  // a second tap on the selected card edits it
+  await card(page, "PM1").tap();
+  await expect(page.getByTestId("card-editor")).toBeVisible();
+  await background();
+  // speech mode: tap = said
+  await page.getByTestId("stage-next").tap();
+  await expect(page.getByTestId("speech-mode")).toHaveAttribute("aria-pressed", "true");
+  await card(page, "OC1").tap();
+  await expect(card(page, "OC1")).toHaveAttribute("data-struck", "true");
+  await expect(page.getByTestId("counter-LOC")).toHaveText(/said\s*1 \/ 1/);
+  // command palette from the top bar
+  await page.getByTestId("open-palette").tap();
+  await page.getByTestId("cmd-next-stage").tap();
+  await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "MG");
+  await ctx.close();
+});

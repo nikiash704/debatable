@@ -100,7 +100,10 @@ export function TopBar({ code, motion, f, side, role, me, peers, status, onSetup
         <span className="side-pill__dot">·</span>
         <span className="side-pill__rest">
           <span data-testid="me">
-            You: {role ?? "—"} ({me.name}, {me.color})
+            You: {role ?? "—"}{" "}
+            <span className="side-pill__detail">
+              ({me.name}, {me.color})
+            </span>
           </span>
           <span className="side-pill__dot">·</span>
           {partner ? (

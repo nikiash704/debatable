@@ -1,4 +1,4 @@
-import { Fragment, memo, type KeyboardEvent } from "react";
+import { Fragment, memo, useEffect, type KeyboardEvent } from "react";
 import type { CardVM, ColumnVM, GroupVM, ZoneVM } from "../engine";
 import { sideOf } from "../engine/stages";
 import type { Focus } from "../engine/commands";
@@ -19,6 +19,13 @@ interface BoardProps {
 }
 
 export function Board({ c, session, peers }: BoardProps) {
+  // Bring the lane being spoken into view when the stage changes (tablets show 3–4 lanes).
+  const current = c.board.speech?.id ?? null;
+  useEffect(() => {
+    if (!current) return;
+    const el = document.querySelector(`[data-lane="${current}"]`);
+    el?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+  }, [current]);
   return (
     <main
       className="board"
@@ -81,7 +88,7 @@ function Zone({ z, col, c, session, peers }: { z: ZoneVM; col: ColumnVM; c: Cont
           )}
         </Fragment>
       ))}
-      {ownZone && col.canAdd && (
+      {ownZone && col.state === "live" && (
         <div style={{ display: "flex", gap: 6, marginTop: groups.length ? 8 : 0 }}>
           {!groups.some((g) => !g.thesis) && (
             <button
@@ -170,7 +177,7 @@ function Cards({ g, z, col, c, session, peers }: { g: GroupVM; z: ZoneVM; col: C
           {i < g.cards.length - 1 && !col.canAdd && <div className="gap" />}
         </Fragment>
       ))}
-      {col.canAdd && (
+      {col.canAdd && (col.state === "live" || g.cards.length === 0) && (
         <>
           {g.cards.length > 0 && <div className="gap" />}
           <button
