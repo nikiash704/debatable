@@ -38,6 +38,10 @@ built for practice rounds and training.
 3. **Claude Code on your laptop** (optional): run `claude` in the repo
    folder, or `claude remote-control` to drive it from the Claude app.
 
+## Feature specs
+
+See `docs/features/` (indexed in `CLAUDE.md`).
+
 ## Tech stack
 
-Not yet chosen. See `docs/decisions.md`.
+Hosting: Cloudflare. The rest is chosen by Claude Code; see `docs/decisions.md`.

@@ -25,6 +25,49 @@ Smart note-taking ("flowing") app for parliamentary debate practice.
   (first and last minute of substantive speeches; never in AP reply speeches).
 - Speech times vary by tournament, so make them configurable, never hard-coded.
 
+## Product decisions (fixed)
+- Practice/training tool, not for live tournament rounds.
+- Web app only, for laptops and tablets.
+- Hosting: **Cloudflare** (Workers / Pages and related services).
+- The format (APDA now, BP and others later) is **config, not code**: the stage engine,
+  cards, numbering and counters read only the format config.
+- Data shape from day one: room → side → flow. v1 has one side per room.
+- No accounts in v1, but the design must allow adding them later
+  (anonymous device ID now → link to an account later, carrying rounds over).
+
+## Feature specs (source of truth for what to build)
+Specs are written in Russian. Read the relevant spec in full before coding a feature.
+Each spec separates the user's decisions from Claude's unconfirmed suggestions;
+the user's decisions are binding, suggestions are not.
+
+| # | Feature | Status | File |
+|---|---|---|---|
+| 01 | Entry and saving (no login, room codes, live sync, server persistence) | decided for v1 | `docs/features/01-vhod-i-sohranenie.md` |
+| 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | **stage 1 approved for coding**; stages 2–3 planned | `docs/features/02-struktura-flou.md` |
+
+These files are copies of the docs in the claude.ai Project "Debatable"
+(`claude/features/*.md`). When a spec changes in either place, update the other.
+
+## Build order
+1. Stack + project skeleton + a deployed "hello world" on Cloudflare.
+2. Feature 01 (rooms, codes, real-time sync, server persistence).
+3. Feature 02, stage 1, on top of 01's sync. Done = all 10 acceptance criteria in the
+   spec pass on the "Ocean vs Space" scenario.
+
+## Tech stack
+Not fixed by the user: **Claude Code chooses it.** Hard constraints:
+- deploys to Cloudflare;
+- real-time collaborative editing where two people can type in the same card at once
+  (character-level merge, so a text CRDT, not last-write-wins on strings);
+- rooms persisted on the server, permanent room codes;
+- offline-first on the device (save locally, then sync in the background);
+- TypeScript.
+Record the chosen stack and the reasons in `docs/decisions.md` before writing app code,
+and update the "Tech stack" section of `README.md`.
+
 ## Workflow
 - Development branch: `claude/admiring-heisenberg-dhraiy`.
-- Designs live in Figma file `TJHHaf0ew3Yl9pHjVkJAxQ`.
+- Commit after each working step with a clear message, so any step can be rolled back.
+- Designs live in Figma file `TJHHaf0ew3Yl9pHjVkJAxQ` (the board view is not drawn yet;
+  follow the written spec).
+- Keep `docs/decisions.md` current when a decision is made.
