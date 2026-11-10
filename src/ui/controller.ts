@@ -6,6 +6,7 @@ import {
   answerPlace,
   cardDrag,
   computeBoard,
+  computeNumbers,
   moveCardOps,
   movePointOps,
   moveThesisOps,
@@ -134,6 +135,9 @@ export interface Controller {
   jumpTo: (cardId: string) => void;
   /** Alt+↑/↓: move a card / thesis / point one slot. Returns a hint when it cannot move. */
   moveStep: (focus: Focus | null, dir: -1 | 1) => string | null;
+  /** Drag preview (null = show the real state). */
+  setPreview: (state: FlowState | null) => void;
+  previewing: boolean;
 }
 
 export function useController(
@@ -143,7 +147,9 @@ export function useController(
   role: string | null,
   opts: { initialView?: View; onView?: (v: View) => void } = {},
 ): Controller {
-  const board = useMemo(() => computeBoard(f, flow), [f, flow]);
+  // drag preview: the board is drawn from the state the drop would give, with the real labels until the drop
+  const [preview, setPreviewState] = useState<FlowState | null>(null);
+  const board = useMemo(() => (preview ? computeBoard(f, preview, { numbers: computeNumbers(f, flow) }) : computeBoard(f, flow)), [f, flow, preview]);
   const [ui, setUi] = useState<UiState>(() => ({
     selection: null,
     editing: false,
@@ -588,8 +594,12 @@ export function useController(
     [f, session],
   );
 
+  const setPreview = useCallback((st: FlowState | null) => setPreviewState(st), []);
+
   return {
     moveStep,
+    setPreview,
+    previewing: !!preview,
     f,
     flow,
     board,

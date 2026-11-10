@@ -7,6 +7,7 @@ import { readJSON, writeJSON } from "../sync/storage";
 import { ensureVerified, startNewRound } from "./App";
 import { Board } from "./Board";
 import { DocView } from "./DocView";
+import { useBoardDrag } from "./drag";
 import { PrepTimerBar, usePrepTimer, type PrepTimerApi } from "./PrepTimer";
 import { copyText, InviteBanner, StageBar, TopBar } from "./Chrome";
 import { useController, type Controller } from "./controller";
@@ -148,6 +149,7 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
     focusJoin: () => (document.querySelector('[data-testid="join-input"]') as HTMLInputElement | null)?.focus(),
   });
 
+  const drag = useBoardDrag(c, session, toast);
   useHotkeys(c, { setupOpen, closeSetup, toast, prep: snap.stage === f.prepStage.id && prep.enabled ? prep : null });
 
   const showInvite = peers.length === 0 && !entry.inviteDismissed;
@@ -175,7 +177,7 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
           <DocView c={c} session={session} peers={peers} />
         ) : (
           <>
-            <Board c={c} session={session} peers={peers} />
+            <Board c={c} session={session} peers={peers} drag={drag} />
             <Legend />
           </>
         )}

@@ -105,6 +105,8 @@ export async function pmcWithAnswers(page: Page) {
   }
   await page.getByTestId("add-LOC-clash").click();
   await typeAndEscape(page, OC[3]);
+  // a card made with "+" in a clash zone starts unlinked: a quiet hint while it is selected
+  await expect(card(page, "OC4").getByTestId("no-target-hint")).toHaveText(/no target · L/);
   await page.keyboard.press("l");
   await expect(page.getByTestId("pick-banner")).toBeVisible();
   await card(page, "PM5").click();

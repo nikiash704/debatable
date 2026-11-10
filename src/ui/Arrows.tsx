@@ -23,7 +23,7 @@ export const hoverStore = {
 const key = (l: { from: string; to: string }) => `${l.from}>${l.to}`;
 
 /** Position of an element inside the grid, ignoring transforms (FLIP animations). */
-function boxIn(el: HTMLElement, grid: HTMLElement) {
+export function boxIn(el: HTMLElement, grid: HTMLElement) {
   let x = 0;
   let y = 0;
   let e: HTMLElement | null = el;

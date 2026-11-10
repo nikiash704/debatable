@@ -2316,3 +2316,47 @@ button.chip--alert:hover {
   padding: 4px 8px;
   font-size: 12px;
 }
+
+/* ---------- Drag and drop ---------- */
+.card,
+.thesis__head,
+.card__point {
+  -webkit-touch-callout: none;
+}
+
+body.dragging,
+body.dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.drag-ghost {
+  box-shadow: 0 12px 28px rgba(23, 23, 28, 0.18) !important;
+  transform: rotate(1deg);
+  opacity: 0.95;
+  background: var(--c-surface);
+  border-radius: var(--r-card);
+}
+
+.drag-ghost--no {
+  outline: 2px solid var(--c-red-border);
+  opacity: 0.7;
+}
+
+/* where the dragged card will land */
+.card--drag-target {
+  border-style: dashed !important;
+  border-color: var(--c-ours-line) !important;
+  background: var(--c-ours-sub-bg) !important;
+  box-shadow: none !important;
+}
+
+.card--drag-target > * {
+  opacity: 0.35;
+}
+
+body.dragging .tooltip,
+body.dragging .card__tools {
+  display: none !important;
+}

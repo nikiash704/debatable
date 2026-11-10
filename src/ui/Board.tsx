@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { CardVM, ColumnVM, GroupKey, Segment } from "../engine";
 import { effectiveZone, sideOf } from "../engine/stages";
 import type { Focus } from "../engine/commands";
 import { getCardText, getPointText, getThesisTitle } from "../sync/doc";
 import type { Peer, RoomSession } from "../sync/session";
-import { ArrowLayer, hoverStore } from "./Arrows";
+import { ArrowLayer, boxIn, hoverStore } from "./Arrows";
 import { CardView } from "./components/CardView";
 import { Chip } from "./components/Chip";
 import { Lane } from "./components/Lane";
@@ -65,8 +65,39 @@ function useFocusInfo(c: Controller): FocusInfo {
   }, [b, sel, pick, c.f.speeches]);
 }
 
+/**
+ * FLIP: while a drag preview is on (and once more on the drop), cards and thesis headers that moved
+ * slide from their old place to the new one, so the others visibly step aside.
+ */
+function useFlip(gridRef: RefObject<HTMLDivElement | null>, on: boolean) {
+  const last = useRef(new Map<string, { x: number; y: number }>());
+  const was = useRef(false);
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const run = on || was.current;
+    was.current = on;
+    const next = new Map<string, { x: number; y: number }>();
+    const seen = new Map<string, number>();
+    grid.querySelectorAll<HTMLElement>('[data-testid="card"], [data-testid="thesis"]').forEach((el) => {
+      const base = el.dataset.cardId ?? `t:${el.dataset.thesisId}:${el.closest("[data-lane]")?.getAttribute("data-lane")}`;
+      const n = seen.get(base) ?? 0;
+      seen.set(base, n + 1);
+      const id = `${base}:${n}`;
+      const b = boxIn(el, grid);
+      next.set(id, { x: b.x, y: b.y });
+      const prev = last.current.get(id);
+      if (run && prev && (Math.abs(prev.x - b.x) > 0.5 || Math.abs(prev.y - b.y) > 0.5) && typeof el.animate === "function") {
+        el.animate([{ transform: `translate(${prev.x - b.x}px, ${prev.y - b.y}px)` }, { transform: "none" }], { duration: 170, easing: "cubic-bezier(.2,.7,.3,1)" });
+      }
+    });
+    last.current = next;
+  });
+}
+
 export function Board({ c, session, peers, drag }: BoardProps) {
   const gridRef = useRef<HTMLDivElement>(null);
+  useFlip(gridRef, c.previewing);
   // Bring the lane being spoken into view when the stage changes (tablets show 3–4 lanes).
   const current = c.board.speech?.id ?? null;
   useEffect(() => {
@@ -616,6 +647,11 @@ export function editorKeys(e: KeyboardEvent<HTMLTextAreaElement>, c: Controller,
     e.preventDefault();
     if (e.shiftKey) c.outdent(focus);
     else c.indent(focus);
+    return;
+  }
+  if (e.altKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    e.preventDefault();
+    c.moveStep(focus, e.key === "ArrowUp" ? -1 : 1);
     return;
   }
   if (e.key === "Backspace" && text === "" && !mod) {
