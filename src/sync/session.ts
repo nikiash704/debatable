@@ -125,19 +125,29 @@ export class RoomSession {
     };
   };
 
+  /** Local ops refresh the snapshot synchronously, so the UI can select what was just created. */
   apply(ops: Op[]) {
     applyOpsToDoc(this.doc, this.snapshot.side, ops, LOCAL);
+    this.refresh();
   }
 
-  /** Recompute the plain snapshot at most once per frame. */
+  private dirty = false;
+
+  private refresh() {
+    if (!this.dirty || this.destroyed) return;
+    this.dirty = false;
+    this.snapshot = readSnapshot(this.doc);
+    this.emit();
+  }
+
+  /** Remote and text changes: recompute the plain snapshot once per burst of updates. */
   private schedule = () => {
+    this.dirty = true;
     if (this.scheduled) return;
     this.scheduled = true;
     queueMicrotask(() => {
       this.scheduled = false;
-      if (this.destroyed) return;
-      this.snapshot = readSnapshot(this.doc);
-      this.emit();
+      this.refresh();
     });
   };
 

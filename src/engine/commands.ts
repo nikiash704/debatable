@@ -1,4 +1,4 @@
-import type { FormatConfig, SpeechId, TagType } from "../config/types";
+import type { FormatConfig, SpeechConfig, SpeechId, TagType } from "../config/types";
 import { nextNumber, thesesOf } from "./numbering";
 import type { Op } from "./ops";
 import { byOrder, keyBetween, keysBetween } from "./order";
@@ -41,16 +41,20 @@ export function groupOf(f: FormatConfig, state: FlowState, speech: SpeechId, zon
   const zones = zonesFor(state.perspective, sp);
   const single = zones.length === 1;
   const known = new Set(state.theses.map((t) => t.id));
+  const thesisZone = hasTheses(state, sp, zone);
   return state.cards
     .filter(
       (c) =>
         c.ownerSpeech === speech &&
         (single || c.zone === zone) &&
-        (zone === "own" && sp.side === state.perspective && !single
-          ? (thesisId ? c.thesisId === thesisId : !c.thesisId || !known.has(c.thesisId))
-          : true),
+        (thesisZone ? (thesisId ? c.thesisId === thesisId : !c.thesisId || !known.has(c.thesisId)) : true),
     )
     .sort(byOrder);
+}
+
+/** Our own-arguments zone is grouped by theses; answers, rebuttals and the opponent's columns are flat lists. */
+export function hasTheses(state: FlowState, sp: SpeechConfig, zone: Zone): boolean {
+  return sp.side === state.perspective && zone === "own" && !!sp.prefixSeries.own;
 }
 
 export function groupOfCard(f: FormatConfig, state: FlowState, card: Card): Card[] {
@@ -78,7 +82,7 @@ export function newCard(f: FormatConfig, state: FlowState, slot: Slot, id: strin
   const zones = zonesFor(state.perspective, sp);
   const zone: Zone = zones.includes(slot.zone) ? slot.zone : zones[0];
   const series = seriesFor(f, state.perspective, sp, zone);
-  const thesisId = ours && zone === "own" && zones.includes("own") && zones.length > 1 ? slot.thesisId : null;
+  const thesisId = ours && hasTheses(state, sp, zone) ? slot.thesisId : null;
   const group = groupOf(f, state, sp.id, zone, thesisId);
   const locked = columnState(f, state.perspective, sp, state.stage) === "locked";
   return {
@@ -221,9 +225,7 @@ export function outdentCard(f: FormatConfig, state: FlowState, cardId: string, n
   const c = find(state, cardId);
   if (!c) return { ops: [] };
   const sp = speechById(f, c.ownerSpeech);
-  if (!sp || c.side !== state.perspective || c.zone !== "own" || !zonesFor(state.perspective, sp).includes("own") || zonesFor(state.perspective, sp).length < 2) {
-    return { ops: [] };
-  }
+  if (!sp || c.side !== state.perspective || !hasTheses(state, sp, c.zone)) return { ops: [] };
   const theses = thesesOf(state, c.side);
   const cur = theses.findIndex((t) => t.id === c.thesisId);
   const after = cur >= 0 ? theses[cur] : theses[theses.length - 1];

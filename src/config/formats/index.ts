@@ -1,9 +1,11 @@
 import type { FormatConfig } from "../types";
 import { APDA } from "./apda";
+import { DEMO_MINI } from "./demo";
 
 /** Registered formats. Adding BP = adding a config file here; the engine does not change. */
 export const FORMATS: Record<string, FormatConfig> = {
   [APDA.id]: APDA,
+  [DEMO_MINI.id]: DEMO_MINI,
 };
 
 export const DEFAULT_FORMAT_ID = APDA.id;

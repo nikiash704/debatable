@@ -73,6 +73,8 @@ export interface FormatConfig {
   id: string;
   name: string;
   short: string;
+  /** Not offered in the UI (test / demo formats). */
+  hidden?: boolean;
   /** Prep length in minutes (0 allowed). */
   prepMinutes: number;
   graceSeconds: number;

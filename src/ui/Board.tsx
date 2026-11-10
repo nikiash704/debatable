@@ -67,7 +67,7 @@ function addLabel(col: ColumnVM, z: ZoneVM): string {
 }
 
 function Zone({ z, col, c, session, peers }: { z: ZoneVM; col: ColumnVM; c: Controller; session: RoomSession; peers: Peer[] }) {
-  const ownZone = col.ours && z.zone === "own" && col.zones.length > 1;
+  const ownZone = col.ours && z.zone === "own" && !!col.speech.prefixSeries.own;
   const groups: GroupVM[] = z.groups.length ? z.groups : ownZone ? [] : [{ thesis: null, thesisNumber: null, cards: [] }];
   return (
     <div className="zone" data-testid={`zone-${col.speech.id}-${z.zone}`}>
@@ -162,11 +162,11 @@ function Cards({ g, z, col, c, session, peers }: { g: GroupVM; z: ZoneVM; col: C
   const slot = { speech: col.speech.id, zone: z.zone, thesisId: g.thesis?.id ?? null };
   return (
     <>
-      {col.canAdd && g.cards.length > 0 && <Gap onAdd={() => c.addAt({ ...slot, atStart: true })} />}
+      {col.canAdd && g.cards.length > 0 && <Gap testId={`gap-before-${g.cards[0].label}`} onAdd={() => c.addAt({ ...slot, atStart: true })} />}
       {g.cards.map((vm, i) => (
         <Fragment key={vm.card.id}>
           <CardItem vm={vm} col={col} c={c} session={session} peers={peers} />
-          {i < g.cards.length - 1 && col.canAdd && <Gap onAdd={() => c.addAt({ ...slot, after: vm.card.id })} />}
+          {i < g.cards.length - 1 && col.canAdd && <Gap testId={`gap-after-${vm.label}`} onAdd={() => c.addAt({ ...slot, after: vm.card.id })} />}
           {i < g.cards.length - 1 && !col.canAdd && <div className="gap" />}
         </Fragment>
       ))}
@@ -189,10 +189,10 @@ function Cards({ g, z, col, c, session, peers }: { g: GroupVM; z: ZoneVM; col: C
   );
 }
 
-function Gap({ onAdd }: { onAdd: () => void }) {
+function Gap({ onAdd, testId }: { onAdd: () => void; testId?: string }) {
   return (
     <div className="gap">
-      <button type="button" className="gap__btn" data-tip="Insert a card here" onClick={onAdd} tabIndex={-1}>
+      <button type="button" className="gap__btn" data-tip="Insert a card here" data-key="A below the selected card" data-testid={testId} onClick={onAdd} tabIndex={-1}>
         <span className="gap__plus">+</span>
       </button>
     </div>
@@ -237,6 +237,7 @@ const CardItem = memo(function CardItem({ vm, col, c, session, peers }: { vm: Ca
               testId={`tag-${t.type}`}
               title={cfg?.needsRef ? `Change ${cfg.label.replace("…", "")}` : `Remove ${cfg?.label ?? t.type}`}
               hotkey={cfg?.hotkey}
+              showKey={false}
               onClick={() => c.tag(card.id, t.type)}
             />
           );
