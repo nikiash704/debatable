@@ -37,6 +37,8 @@ export interface RoomSnapshot {
   /** Raw prep timer value (see engine/timer.ts) and the run that already ended prep. */
   prepTimer: unknown;
   prepAdvanced: string | null;
+  /** Changes every time the timer ends prep (devices show "Prep over — board" once per change). */
+  prepEnded: string | null;
   flow: FlowState;
   /** Nothing has been written to the document yet. */
   empty: boolean;
@@ -133,6 +135,7 @@ export function readSnapshot(doc: Y.Doc): RoomSnapshot {
     prepMinutes: typeof prep === "number" ? prep : null,
     prepTimer: room.get("prepTimer") ?? null,
     prepAdvanced: typeof room.get("prepAdvanced") === "string" ? (room.get("prepAdvanced") as string) : null,
+    prepEnded: typeof room.get("prepEnded") === "string" ? (room.get("prepEnded") as string) : null,
     flow: { stage, perspective: side, cards, theses },
     empty: doc.store.clients.size === 0,
   };
@@ -279,6 +282,7 @@ export function advancePrepOnce(doc: Y.Doc, side: SideId, runId: string, prepSta
     const stage = typeof room.get("stage") === "string" ? room.get("stage") : prepStage;
     if (stage !== prepStage || room.get("prepAdvanced") === runId) return;
     room.set("prepAdvanced", runId);
+    room.set("prepEnded", `${runId}:${doc.clientID}`);
     applyOpsToDoc(doc, side, ops, TIMER);
     done = true;
   }, TIMER);

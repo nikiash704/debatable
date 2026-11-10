@@ -6,6 +6,8 @@ import { RoomSession, randomIdentity, type Identity } from "../sync/session";
 import { readJSON, writeJSON } from "../sync/storage";
 import { ensureVerified, startNewRound } from "./App";
 import { Board } from "./Board";
+import { DocView } from "./DocView";
+import { PrepTimerBar, usePrepTimer, type PrepTimerApi } from "./PrepTimer";
 import { copyText, InviteBanner, StageBar, TopBar } from "./Chrome";
 import { useController, type Controller } from "./controller";
 import { isTyping, MOD } from "./keys";
@@ -94,14 +96,28 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
   const side = snap.side;
   const sideMembers = f.sides.find((s) => s.id === side)?.members ?? [];
   const role = entry.role && sideMembers.some((m) => m.id === entry.role) ? entry.role : (f.defaults.role[side] ?? sideMembers[0]?.id ?? null);
-  const c = useController(session, f, snap.flow, role);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const c = useController(session, f, snap.flow, role, {
+    initialView: entry.view,
+    onView: (v) => updateRoom(entry.code, { view: v }),
+  });
+  const prep = usePrepTimer(session, f, snap);
+  const [toastMsg, setToastMsg] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
-  const toast = useCallback((m: string) => {
-    setToastMsg(m);
+  const toast = useCallback((m: string, action?: { label: string; run: () => void }) => {
+    setToastMsg({ text: m, action });
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), 1800);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), action ? 8000 : 1800);
   }, []);
+
+  // The timer ended prep (on this device or the partner's): both switch to the Board, with Undo.
+  const seenPrepEnd = useRef(snap.prepEnded);
+  useEffect(() => {
+    if (snap.prepEnded === seenPrepEnd.current) return;
+    seenPrepEnd.current = snap.prepEnded;
+    if (!snap.prepEnded || snap.stage === f.prepStage.id) return;
+    c.setView("board");
+    toast("Prep over — board", { label: "Undo", run: () => c.goStage(f.prepStage.id) });
+  }, [snap.prepEnded, snap.stage, f.prepStage.id, c, toast]);
   const [setupOpen, setSetupOpen] = useState(entry.createdHere && !entry.setupDismissed && !entry.edited);
 
   // Keep the device's list of rounds up to date (motion, side, role; edited = stored for good).
@@ -126,12 +142,13 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
   const setRole = useCallback((r: string) => updateRoom(entry.code, { role: r }), [entry.code]);
 
   const commands = useCommands(c, {
+    prep: snap.stage === f.prepStage.id && prep.enabled ? prep : null,
     openSetup: () => setSetupOpen(true),
     copyLink: async () => toast((await copyText(inviteLink(entry.code))) ? "Invite link copied" : inviteLink(entry.code)),
     focusJoin: () => (document.querySelector('[data-testid="join-input"]') as HTMLInputElement | null)?.focus(),
   });
 
-  useHotkeys(c, { setupOpen, closeSetup });
+  useHotkeys(c, { setupOpen, closeSetup, toast, prep: snap.stage === f.prepStage.id && prep.enabled ? prep : null });
 
   const showInvite = peers.length === 0 && !entry.inviteDismissed;
   return (
@@ -152,10 +169,16 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
         onView={c.setView}
       />
       {showInvite && <InviteBanner code={entry.code} onDismiss={() => updateRoom(entry.code, { inviteDismissed: true })} toast={toast} />}
-      <StageBar c={c} />
+      <StageBar c={c} timer={snap.stage === f.prepStage.id && prep.enabled ? <PrepTimerBar t={prep} /> : null} />
       <div className="app__body">
-        <Board c={c} session={session} peers={peers} />
-        <Legend />
+        {c.ui.view === "doc" ? (
+          <DocView c={c} session={session} peers={peers} />
+        ) : (
+          <>
+            <Board c={c} session={session} peers={peers} />
+            <Legend />
+          </>
+        )}
         {setupOpen && (
           <SetupPanel
             session={session}
@@ -173,7 +196,20 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
       {c.ui.picker && <CardPicker c={c} />}
       {toastMsg && (
         <div className="toast" role="status" data-testid="toast">
-          {toastMsg}
+          <span data-testid="toast-text">{toastMsg.text}</span>
+          {toastMsg.action && (
+            <button
+              type="button"
+              className="toast__action"
+              data-testid="toast-action"
+              onClick={() => {
+                toastMsg.action!.run();
+                setToastMsg(null);
+              }}
+            >
+              {toastMsg.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -201,7 +237,7 @@ function Legend() {
   );
 }
 
-function useCommands(c: Controller, extra: { openSetup: () => void; copyLink: () => void; focusJoin: () => void }): Command[] {
+function useCommands(c: Controller, extra: { prep: PrepTimerApi | null; openSetup: () => void; copyLink: () => void; focusJoin: () => void }): Command[] {
   const f = c.f;
   const sel = c.ui.selection;
   const cardId = sel?.kind === "card" ? sel.id : sel?.kind === "point" ? sel.cardId : null;
@@ -226,6 +262,15 @@ function useCommands(c: Controller, extra: { openSetup: () => void; copyLink: ()
     );
   }
   list.push({ id: "view", label: c.ui.view === "board" ? "Doc view (outline for prep)" : "Board view", hotkey: "D", group: "View", run: c.toggleView });
+  if (extra.prep) {
+    const p = extra.prep;
+    list.push(
+      { id: "prep-toggle", label: p.running ? "Pause prep timer" : "Start prep timer", hotkey: "Shift+Space", group: "Prep", run: p.toggle },
+      { id: "prep-plus", label: "Prep timer +1 min", hotkey: "+", group: "Prep", run: p.plus },
+      { id: "prep-reset", label: "Reset prep timer", hotkey: "Shift+R", group: "Prep", run: p.reset },
+    );
+  }
+  if (sel) list.push({ id: "move-up", label: "Move up", hotkey: "Alt+↑", group: "Cards", run: () => c.moveStep(sel, -1) }, { id: "move-down", label: "Move down", hotkey: "Alt+↓", group: "Cards", run: () => c.moveStep(sel, 1) });
   if (card) {
     const place = c.answerPlaceOf(card.card.id);
     if (place.ok) list.push({ id: "answer", label: `Answer ${card.label}`, hotkey: "R", group: "Clash", run: () => c.answer(card.card.id) });
@@ -264,7 +309,10 @@ function useCommands(c: Controller, extra: { openSetup: () => void; copyLink: ()
 }
 
 /** Global hotkeys while not typing (spec 02 «Создание и ввод»). */
-function useHotkeys(c: Controller, o: { setupOpen: boolean; closeSetup: () => void }) {
+function useHotkeys(
+  c: Controller,
+  o: { setupOpen: boolean; closeSetup: () => void; toast: (m: string) => void; prep: PrepTimerApi | null },
+) {
   const ref = useRef({ c, o });
   ref.current = { c, o };
   useEffect(() => {
@@ -306,6 +354,31 @@ function useHotkeys(c: Controller, o: { setupOpen: boolean; closeSetup: () => vo
       }
       const sel = c.ui.selection;
       const cardId = sel?.kind === "card" ? sel.id : sel?.kind === "point" ? sel.cardId : null;
+      // keyboard drag: Alt+↑/↓ moves the selection one slot
+      if (e.altKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        const hint = c.moveStep(sel, e.key === "ArrowUp" ? -1 : 1);
+        if (hint) o.toast(hint);
+        return;
+      }
+      // prep timer
+      if (o.prep && !mod && !e.altKey) {
+        if (e.key === " " && e.shiftKey) {
+          e.preventDefault();
+          o.prep.toggle();
+          return;
+        }
+        if (e.key === "+") {
+          e.preventDefault();
+          o.prep.plus();
+          return;
+        }
+        if (e.key === "R" && e.shiftKey) {
+          e.preventDefault();
+          o.prep.reset();
+          return;
+        }
+      }
       if (mod && e.key === "Enter") {
         e.preventDefault();
         if (cardId) c.said(cardId);

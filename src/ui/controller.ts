@@ -4,7 +4,14 @@ import {
   addPoint,
   answerCard,
   answerPlace,
+  cardDrag,
   computeBoard,
+  moveCardOps,
+  movePointOps,
+  moveThesisOps,
+  pointDrag,
+  stepSlot,
+  thesisDrag,
   createCard,
   createCardBelow,
   createThesis,
@@ -125,9 +132,17 @@ export interface Controller {
   toggleView: () => void;
   /** Select a card and bring it into view (unanswered pill). */
   jumpTo: (cardId: string) => void;
+  /** Alt+↑/↓: move a card / thesis / point one slot. Returns a hint when it cannot move. */
+  moveStep: (focus: Focus | null, dir: -1 | 1) => string | null;
 }
 
-export function useController(session: RoomSession, f: FormatConfig, flow: FlowState, role: string | null): Controller {
+export function useController(
+  session: RoomSession,
+  f: FormatConfig,
+  flow: FlowState,
+  role: string | null,
+  opts: { initialView?: View; onView?: (v: View) => void } = {},
+): Controller {
   const board = useMemo(() => computeBoard(f, flow), [f, flow]);
   const [ui, setUi] = useState<UiState>(() => ({
     selection: null,
@@ -137,13 +152,18 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     picker: null,
     tagMenu: null,
     palette: false,
-    // the round opens in the Doc view during Prep (spec 02 requirement 1)
-    view: flow.stage === f.prepStage.id ? "doc" : "board",
+    // the device's last view of this room; otherwise the Doc view during Prep (spec 02 requirement 1)
+    view: opts.initialView ?? (flow.stage === f.prepStage.id ? "doc" : "board"),
     pick: null,
     link: null,
   }));
   const flowRef = useRef(flow);
   flowRef.current = flow;
+  const onView = useRef(opts.onView);
+  onView.current = opts.onView;
+  useEffect(() => {
+    onView.current?.(ui.view);
+  }, [ui.view]);
   const boardRef = useRef(board);
   boardRef.current = board;
   const uiRef = useRef(ui);
@@ -151,13 +171,15 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
 
   // Manual speech-mode override lasts for one stage. Entering Prep opens the Doc view, leaving it the Board.
   const lastStage = useRef(flow.stage);
+  const lastPrep = useRef(flow.stage === f.prepStage.id);
   useEffect(() => {
-    if (lastStage.current !== flow.stage) {
-      const wasPrep = lastStage.current === f.prepStage.id;
-      const isPrep = flow.stage === f.prepStage.id;
-      lastStage.current = flow.stage;
-      setUi((u) => ({ ...u, speechOverride: null, view: isPrep ? "doc" : wasPrep ? "board" : u.view, pick: null }));
-    }
+    if (lastStage.current === flow.stage) return;
+    const isPrep = flow.stage === f.prepStage.id;
+    const enters = isPrep && !lastPrep.current;
+    const leaves = !isPrep && lastPrep.current;
+    lastStage.current = flow.stage;
+    lastPrep.current = isPrep;
+    setUi((u) => ({ ...u, speechOverride: null, view: enters ? "doc" : leaves ? "board" : u.view, pick: null }));
   }, [flow.stage, f.prepStage.id]);
 
   // Drop selection if the item disappeared (deleted here or by the partner).
@@ -536,7 +558,38 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     [session],
   );
 
+  const moveStep = useCallback(
+    (focus: Focus | null, dir: -1 | 1): string | null => {
+      const t = focus ?? uiRef.current.selection;
+      const state = flowRef.current;
+      const layout = boardRef.current.layout;
+      if (!t) return null;
+      if (t.kind === "card") {
+        const d = cardDrag(f, state, layout, t.id);
+        if (!d) return null;
+        const n = stepSlot(d.current, d.slots.length, dir);
+        if (n === null) return d.mode === "row" ? "Use L to change the target" : null;
+        session.apply(moveCardOps(state, t.id, d.slots[n]));
+      } else if (t.kind === "thesis") {
+        const d = thesisDrag(state, t.id);
+        const n = d ? stepSlot(d.current, d.slots.length, dir) : null;
+        if (!d || n === null) return null;
+        session.apply(moveThesisOps(t.id, d.slots[n]));
+      } else {
+        const d = pointDrag(state, layout, t.cardId, t.pointId);
+        const n = d ? stepSlot(d.current, d.slots.length, dir) : null;
+        if (!d || n === null) return null;
+        const slot = d.slots[n];
+        session.apply(movePointOps(state, t.cardId, t.pointId, slot));
+        if (slot.cardId !== t.cardId) setUi((u) => ({ ...u, selection: { kind: "point", cardId: slot.cardId, pointId: t.pointId } }));
+      }
+      return null;
+    },
+    [f, session],
+  );
+
   return {
+    moveStep,
     f,
     flow,
     board,

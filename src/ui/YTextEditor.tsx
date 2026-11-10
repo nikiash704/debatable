@@ -11,6 +11,7 @@ export interface YTextEditorProps {
   caret?: "end" | "start" | "all";
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   /** Undo/redo for the whole room (Cmd/Ctrl+Z inside the editor). */
   onUndo?: () => void;
   onRedo?: () => void;
@@ -32,6 +33,7 @@ export function YTextEditor({
   caret = "end",
   onKeyDown,
   onBlur,
+  onFocus,
   onUndo,
   onRedo,
   testId,
@@ -160,6 +162,7 @@ export function YTextEditor({
         onKeyDown?.(e);
       }}
       onBlur={onBlur}
+      onFocus={onFocus}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}

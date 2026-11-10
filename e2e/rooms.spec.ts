@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { card, newDevice, openNewRoom, openRoom, typeAndEscape, waitSynced } from "./helpers";
+import { card, newDevice, openNewRoom, openRoom, showView, typeAndEscape, waitSynced } from "./helpers";
 
 /** Feature 01: entry and saving (no login, room codes, live sync, server persistence). */
 
@@ -67,6 +67,7 @@ test("two devices: join by code, live sync, same-card typing merges, partner hig
   await b.page.getByTestId("join-input").press("Enter");
   await expect(b.page).toHaveURL(new RegExp(`/r/${code}$`));
   await waitSynced(b.page);
+  await showView(b.page, "board"); // stage 2: a round in Prep opens in the Doc view
 
   // presence: auto-generated names and colours, never the same
   await expect(a.page.getByTestId("partner")).toBeVisible();

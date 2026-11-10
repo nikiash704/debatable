@@ -18,6 +18,8 @@ export interface RoomEntry {
   role: string | null;
   setupDismissed: boolean;
   inviteDismissed: boolean;
+  /** Board or Doc view last used on this device (stage 2). */
+  view?: "board" | "doc";
   identity: { name: string; color: string; hex: string } | null;
   createdAt: number;
   openedAt: number;

@@ -2118,3 +2118,201 @@ button.chip--alert:hover {
   color: #86efac;
   font-weight: 600;
 }
+
+/* ---------- Doc view (prep outline) ---------- */
+.doc {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 24px 16px 120px;
+}
+
+.doc__page {
+  max-width: 760px;
+  margin: 0 auto;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--sh-panel);
+  padding: 28px 36px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.doc__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.doc__hint {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.doc__hint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+.doc__empty {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+  margin: 4px 0 12px;
+}
+
+.doc__section {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.72px;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  margin: 14px 0 4px;
+}
+
+.doc__line {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--r-badge);
+  padding: 3px 6px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.doc__line--active {
+  background: var(--c-ours-sub-bg);
+}
+
+.doc__line--thesis {
+  margin-top: 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.doc__line--card {
+  padding-left: 34px;
+}
+
+.doc__line--point {
+  padding-left: 62px;
+  color: var(--c-text-secondary);
+}
+
+.doc__marker {
+  flex: none;
+  min-width: 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-ours-badge-text);
+  line-height: 22px;
+}
+
+.doc__line--point .doc__marker {
+  color: var(--c-text-muted);
+}
+
+.doc__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.doc__label {
+  flex: none;
+  font-size: 10px;
+  color: var(--c-text-muted);
+  line-height: 22px;
+}
+
+.doc__partner {
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--r-badge);
+  padding: 0 6px;
+}
+
+.doc__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.doc__actions .add-btn {
+  width: auto;
+}
+
+.doc__foot {
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+/* ---------- Prep timer (stage bar, where the mock has the speech timer) ---------- */
+.prep-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.prep-timer__clock {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 3px;
+  margin-right: 4px;
+}
+
+.prep-timer__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-text-tertiary);
+}
+
+.prep-timer__time {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.prep-timer__total {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.prep-timer__bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c-fill-subtle);
+  overflow: hidden;
+}
+
+.prep-timer__bar > div {
+  height: 100%;
+  background: var(--c-ink);
+}
+
+.prep-timer__btn {
+  padding: 4px 8px;
+  font-size: 12px;
+}

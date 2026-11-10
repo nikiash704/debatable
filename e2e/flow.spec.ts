@@ -423,6 +423,7 @@ test("touch: on a tablet the main actions work by tapping", async ({ browser }) 
   await page.goto("/");
   await expect(page.getByTestId("room")).toBeVisible();
   if (await page.getByTestId("setup-panel").isVisible()) await page.getByTestId("setup-close").tap();
+  await page.getByTestId("view-board").tap(); // stage 2: a new round in Prep opens in the Doc view
   // empty board area between two lanes (tapping it ends editing and clears the selection)
   const background = () => page.getByTestId("board").tap({ position: { x: 976, y: 400 } });
   // create and type, tap away to finish

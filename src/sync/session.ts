@@ -6,7 +6,7 @@ import { FORMATS } from "../config/formats";
 import { PARTICIPANT_COLORS, PARTICIPANT_NAMES } from "../config/names";
 import type { Op } from "../engine/ops";
 import { ROOM_PARTY } from "../shared/api";
-import { applyOpsToDoc, LOCAL, readSnapshot, undoScope, type RoomSnapshot } from "./doc";
+import { advancePrepOnce, applyOpsToDoc, LOCAL, readSnapshot, setPrepTimer, undoScope, type RoomSnapshot } from "./doc";
 import { getDeviceId, requestPersistentStorage } from "./storage";
 
 export type SyncStatus = "loading" | "local" | "connecting" | "synced" | "offline";
@@ -132,6 +132,19 @@ export class RoomSession {
     applyOpsToDoc(this.doc, this.snapshot.side, ops, LOCAL);
     this.undo.stopCapturing();
     this.refresh();
+  }
+
+  /** Prep timer actions (synced room state). */
+  setPrepTimer(value: unknown) {
+    setPrepTimer(this.doc, value);
+    this.refresh();
+  }
+
+  /** The prep timer reached 0: move to the first speech, at most once per run (see advancePrepOnce). */
+  advancePrep(runId: string, prepStage: string, ops: Op[]): boolean {
+    const done = advancePrepOnce(this.doc, this.snapshot.side, runId, prepStage, ops);
+    this.refresh();
+    return done;
   }
 
   /** Closes the current undo step (when editing starts or stops). */
