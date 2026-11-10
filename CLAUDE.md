@@ -66,7 +66,8 @@ Record the chosen stack and the reasons in `docs/decisions.md` before writing ap
 and update the "Tech stack" section of `README.md`.
 
 ## Workflow
-- Development branch: `claude/admiring-heisenberg-dhraiy`.
+- Branches: each Claude Code session works on its own branch (the one the session
+  assigns). Finished work is merged into `main` through a pull request.
 - Commit after each working step with a clear message, so any step can be rolled back.
 - Designs live in Figma file `TJHHaf0ew3Yl9pHjVkJAxQ` (the board view is not drawn yet;
   follow the written spec).
