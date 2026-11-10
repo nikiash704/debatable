@@ -8,11 +8,11 @@ Decisions (user's and Claude's defaults): `docs/decisions.md`.
 
 | Milestone | Status |
 |---|---|
-| M0 Stack + skeleton + deploy | Done locally. Stack recorded in `docs/decisions.md` and `README.md`. **Deploy not done: no Cloudflare login in the cloud session** (see "Deploy"). |
+| M0 Stack + skeleton + deploy | Done. Stack recorded in `docs/decisions.md` and `README.md`. Deployed 10.11.2026 to **https://debatable.nikiash704.workers.dev** (stage 1). |
 | M1 Design foundation | Done. Tokens in `src/styles/tokens.css` (from the cached Figma exports in `docs/design-ref/`); top bar, stage stepper, lane, argument card (ours / neutral / red), chip, thesis group; `/dev/gallery` mirrors Figma frame 3:2. |
 | M2 Feature 01 | Done. No entry screen, 5-character permanent codes reserved on the server, last round reopens, "Have a code?", recent list, invite banner with link + QR, non-blocking Round setup, live Yjs sync over a Durable Object per room, presence (names/colours, partner highlight), IndexedDB offline copy, server persistence. |
 | M3 Feature 02, stage 1 | Done. APDA config + pure engine with unit tests; board UI with speech mode, counter, hotkeys, Cmd/Ctrl+K palette, hotkey tooltips, mouse + keyboard + touch. |
-| M4 Verify and ship | Tests done and green. Deploy pending (Cloudflare login). |
+| M4 Verify and ship | Done. Tests green; deployed (two-device e2e test also passes against the deployed URL). |
 
 ## Tests (all passing)
 
@@ -32,16 +32,11 @@ Decisions (user's and Claude's defaults): `docs/decisions.md`.
 
 ## Deploy
 
-`npm run deploy` (= build + `wrangler deploy`) needs a Cloudflare account. The cloud session has no
-login and no `CLOUDFLARE_API_TOKEN`. Either:
-- on a laptop: `npm install && npx wrangler login && npm run deploy`, or
-- create an API token from the "Edit Cloudflare Workers" template and add it to the cloud
-  environment (network secret for `api.cloudflare.com`, or `CLOUDFLARE_API_TOKEN`), then run
-  `npm run deploy`. If the account never used Workers, pick a `*.workers.dev` subdomain once in the
-  dashboard (Workers & Pages).
-The first deploy prints the URL (`https://debatable.<subdomain>.workers.dev`). The free plan is enough
-(SQLite-backed Durable Objects). `wrangler deploy --temporary` was not used (it accepts Cloudflare's
-terms on the user's behalf).
+URL: **https://debatable.nikiash704.workers.dev** (Worker `debatable` on the user's Cloudflare account, free plan,
+SQLite-backed Durable Objects). Deploy again with `npm run deploy` (= build + `wrangler deploy`); the laptop is
+logged in with `wrangler login`. In a cloud session without a login, set `CLOUDFLARE_API_TOKEN`
+("Edit Cloudflare Workers" template). Smoke test: `curl <url>/api/health` and
+`E2E_BASE_URL=<url> npx playwright test e2e/rooms.spec.ts -g "two devices"`.
 
 ## Next
 

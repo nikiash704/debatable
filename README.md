@@ -3,6 +3,8 @@
 A smart note-taking (flowing) app for competitive parliamentary debating,
 built for practice rounds and training.
 
+**Live app:** https://debatable.nikiash704.workers.dev (Cloudflare Worker, deployed with `npm run deploy`).
+
 ## Supported formats
 
 | Format | Teams | Speakers | Speeches |
