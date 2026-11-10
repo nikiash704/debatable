@@ -1,8 +1,8 @@
-import type { FormatConfig, SpeechConfig, SpeechId, TagType } from "../config/types";
+import type { FormatConfig, SpeechId, TagType } from "../config/types";
 import { nextNumber, thesesOf } from "./numbering";
 import type { Op } from "./ops";
 import { byOrder, keyBetween, keysBetween } from "./order";
-import { columnState, currentSpeech, rebuttalInProgress, seriesFor, speechById, zonesFor } from "./stages";
+import { columnState, currentSpeech, hasTheses, rebuttalInProgress, seriesFor, speechById, zonesFor } from "./stages";
 import type { Card, FlowState, Tag, Thesis, Zone } from "./types";
 
 /** Pure commands: (config, state, args) → ops. Ids come from the caller so commands stay deterministic. */
@@ -52,10 +52,7 @@ export function groupOf(f: FormatConfig, state: FlowState, speech: SpeechId, zon
     .sort(byOrder);
 }
 
-/** Our own-arguments zone is grouped by theses; answers, rebuttals and the opponent's columns are flat lists. */
-export function hasTheses(state: FlowState, sp: SpeechConfig, zone: Zone): boolean {
-  return sp.side === state.perspective && zone === "own" && !!sp.prefixSeries.own;
-}
+export { hasTheses };
 
 export function groupOfCard(f: FormatConfig, state: FlowState, card: Card): Card[] {
   return groupOf(f, state, card.ownerSpeech, card.zone, card.thesisId);
@@ -130,6 +127,7 @@ export function deleteCard(state: FlowState, cardId: string): Result {
     if (other.tags.some((t) => t.refCardId === cardId)) {
       ops.push({ t: "card.update", id: other.id, patch: { tags: other.tags.filter((t) => t.refCardId !== cardId) } });
     }
+    if (other.respondsTo.includes(cardId)) ops.push({ t: "card.unlink", id: other.id, target: cardId });
   }
   return { ops };
 }
@@ -287,7 +285,7 @@ export function createThesis(state: FlowState, side: string, afterThesisId: stri
  * Tab on a thesis: its title becomes a card at the end of the previous thesis (in the given column),
  * and its cards move to the previous thesis, after that thesis's cards.
  */
-export function indentThesis(f: FormatConfig, state: FlowState, thesisId: string, speech: SpeechId, newId: IdGen): Result {
+export function indentThesis(f: FormatConfig, state: FlowState, thesisId: string, speech: SpeechId, newId: IdGen, keepEmpty = false): Result {
   const t = state.theses.find((x) => x.id === thesisId);
   if (!t) return { ops: [] };
   const theses = thesesOf(state, t.side);
@@ -302,7 +300,7 @@ export function indentThesis(f: FormatConfig, state: FlowState, thesisId: string
   for (const col of columns) {
     const target = groupOf(f, state, col, "own", prev.id);
     const moving = groupOf(f, state, col, "own", thesisId);
-    const titleCard = col === speech && t.title.trim() ? 1 : 0;
+    const titleCard = col === speech && (t.title.trim() || keepEmpty) ? 1 : 0;
     const keys = keysBetween(target[target.length - 1]?.order ?? null, null, titleCard + moving.length);
     if (titleCard) {
       const card = newCard(f, state, { speech: col, zone: "own", thesisId: prev.id }, newId(), t.title);

@@ -11,13 +11,20 @@ import type { Card, FlowState, Point, Tag, Thesis } from "../engine/types";
  *   room   (Map)   format, stage, side (our side), prepMinutes, v
  *   times  (Map)   speechId → minutes (overrides of the format defaults)
  *   motion (Text)
- *   cards:<side>  (Map) cardId → Map { …Card fields, text: Text, points: Array<Map{id, text: Text}> }
+ *   cards:<side>  (Map) cardId → Map { …Card fields, text: Text, points: Array<Map{id, text: Text}>,
+ *                                     respondsTo: Array<string> }
+ *   room.prepTimer  { runId, endsAt, remainingMs, totalMs } (plain value, last write wins per action)
+ *   room.prepAdvanced  runId of the prep run that already moved the round to the first speech
  *   theses:<side> (Map) thesisId → Map { id, side, title: Text, order }
  *
  * Every shared container is top-level (or created together with its parent card), so two devices
  * never race to create the same nested type. Card and thesis text are Y.Text (character merge).
+ * `respondsTo` is a Y.Array so two devices can link / unlink the same card at once (stage 2); rooms from
+ * stage 1 stored a plain array, which is still read and turned into a Y.Array on its first link.
  */
 export const LOCAL = Symbol("local-edit");
+/** Timer actions and the automatic end of prep: synced, but not part of Cmd+Z undo. */
+export const TIMER = Symbol("timer");
 export const SCHEMA_VERSION = 1;
 
 export interface RoomSnapshot {
@@ -27,6 +34,9 @@ export interface RoomSnapshot {
   motion: string;
   times: Record<string, number>;
   prepMinutes: number | null;
+  /** Raw prep timer value (see engine/timer.ts) and the run that already ended prep. */
+  prepTimer: unknown;
+  prepAdvanced: string | null;
   flow: FlowState;
   /** Nothing has been written to the document yet. */
   empty: boolean;
@@ -53,6 +63,12 @@ function str(v: unknown): string {
   return v instanceof Y.Text ? v.toString() : typeof v === "string" ? v : "";
 }
 
+/** Targets in link order, without duplicates (two devices may link the same target at once). */
+function readTargets(v: unknown): string[] {
+  const list = v instanceof Y.Array ? (v.toArray() as unknown[]) : Array.isArray(v) ? v : [];
+  return [...new Set(list.filter((x): x is string => typeof x === "string"))];
+}
+
 function readCard(m: Y.Map<unknown>): Card | null {
   const id = m.get("id");
   if (typeof id !== "string") return null;
@@ -75,7 +91,7 @@ function readCard(m: Y.Map<unknown>): Card | null {
     tags: Array.isArray(m.get("tags")) ? (m.get("tags") as Tag[]) : [],
     saidIn: typeof m.get("saidIn") === "string" ? (m.get("saidIn") as string) : null,
     carriedFrom: typeof m.get("carriedFrom") === "string" ? (m.get("carriedFrom") as string) : null,
-    respondsTo: Array.isArray(m.get("respondsTo")) ? (m.get("respondsTo") as string[]) : [],
+    respondsTo: readTargets(m.get("respondsTo")),
     groupId: typeof m.get("groupId") === "string" ? (m.get("groupId") as string) : null,
     order: String(m.get("order") ?? "a0"),
   };
@@ -115,6 +131,8 @@ export function readSnapshot(doc: Y.Doc): RoomSnapshot {
     motion: motionText(doc).toString(),
     times,
     prepMinutes: typeof prep === "number" ? prep : null,
+    prepTimer: room.get("prepTimer") ?? null,
+    prepAdvanced: typeof room.get("prepAdvanced") === "string" ? (room.get("prepAdvanced") as string) : null,
     flow: { stage, perspective: side, cards, theses },
     empty: doc.store.clients.size === 0,
   };
@@ -136,9 +154,12 @@ function pointMap(p: Point): Y.Map<unknown> {
 function cardMap(c: Card): Y.Map<unknown> {
   const m = new Y.Map<unknown>();
   for (const [k, v] of Object.entries(c)) {
-    if (k === "text" || k === "points") continue;
+    if (k === "text" || k === "points" || k === "respondsTo") continue;
     m.set(k, v as unknown);
   }
+  const targets = new Y.Array<string>();
+  if (c.respondsTo.length) targets.push([...new Set(c.respondsTo)]);
+  m.set("respondsTo", targets);
   m.set("text", textOf(c.text));
   const points = new Y.Array<Y.Map<unknown>>();
   points.push(c.points.map(pointMap));
@@ -170,6 +191,34 @@ export function applyOpsToDoc(doc: Y.Doc, side: SideId, ops: Op[], origin: unkno
         case "card.delete":
           cards.delete(op.id);
           break;
+        case "card.link": {
+          const m = cards.get(op.id);
+          if (!m) break;
+          const cur = m.get("respondsTo");
+          if (cur instanceof Y.Array) {
+            if (!(cur.toArray() as string[]).includes(op.target)) cur.push([op.target]);
+          } else {
+            // stage-1 room: plain array → Y.Array (once)
+            const arr = new Y.Array<string>();
+            arr.push([...new Set([...readTargets(cur), op.target])]);
+            m.set("respondsTo", arr);
+          }
+          break;
+        }
+        case "card.unlink": {
+          const m = cards.get(op.id);
+          if (!m) break;
+          const cur = m.get("respondsTo");
+          if (cur instanceof Y.Array) {
+            const list = cur.toArray() as string[];
+            for (let i = list.length - 1; i >= 0; i--) if (list[i] === op.target) cur.delete(i, 1);
+          } else if (Array.isArray(cur)) {
+            const arr = new Y.Array<string>();
+            arr.push(readTargets(cur).filter((t) => t !== op.target));
+            m.set("respondsTo", arr);
+          }
+          break;
+        }
         case "point.insert": {
           const pts = cards.get(op.cardId)?.get("points");
           if (pts instanceof Y.Array) pts.insert(Math.max(0, Math.min(op.index, pts.length)), [pointMap(op.point)]);
@@ -206,6 +255,34 @@ export function applyOpsToDoc(doc: Y.Doc, side: SideId, ops: Op[], origin: unkno
       }
     }
   }, origin);
+}
+
+/** Prep timer actions (synced room state, not part of undo). */
+export function setPrepTimer(doc: Y.Doc, value: unknown) {
+  doc.transact(() => {
+    const room = roomMap(doc);
+    if (room.get("v") !== SCHEMA_VERSION) room.set("v", SCHEMA_VERSION);
+    room.set("prepTimer", value);
+  }, TIMER);
+}
+
+/**
+ * Ends prep for one timer run, at most once: inside one transaction it checks that the room is still in
+ * Prep and that this run has not ended prep before, then marks the run and applies the stage change.
+ * Two devices (or a reconnect) may both call it; the second finds the run marked / the stage moved, and
+ * if both run it offline they write the same values, so the merged room is in the first speech once.
+ */
+export function advancePrepOnce(doc: Y.Doc, side: SideId, runId: string, prepStage: string, ops: Op[]): boolean {
+  let done = false;
+  doc.transact(() => {
+    const room = roomMap(doc);
+    const stage = typeof room.get("stage") === "string" ? room.get("stage") : prepStage;
+    if (stage !== prepStage || room.get("prepAdvanced") === runId) return;
+    room.set("prepAdvanced", runId);
+    applyOpsToDoc(doc, side, ops, TIMER);
+    done = true;
+  }, TIMER);
+  return done;
 }
 
 /** Room-level settings (round setup). */

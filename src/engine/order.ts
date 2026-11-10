@@ -17,3 +17,8 @@ export function byOrder<T extends { order: string; id: string }>(x: T, y: T): nu
   if (x.order > y.order) return 1;
   return x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
 }
+
+/** A side's theses in order. */
+export function thesesOf<T extends { side: string; order: string; id: string }>(state: { theses: T[] }, side: string): T[] {
+  return state.theses.filter((t) => t.side === side).sort(byOrder);
+}

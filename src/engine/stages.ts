@@ -1,5 +1,5 @@
 import type { FormatConfig, SideId, SpeechConfig, StageId } from "../config/types";
-import type { Card, Zone } from "./types";
+import type { Card, FlowState, Zone } from "./types";
 
 export interface StageInfo {
   id: StageId;
@@ -109,4 +109,20 @@ export function pointLabel(n: number, i: number): string {
     k = Math.floor(k / 26) - 1;
   } while (k >= 0);
   return `${n}${s}`;
+}
+
+/** Our own-arguments zone is grouped by theses; answers, rebuttals and the opponent's columns are flat lists. */
+export function hasTheses(state: Pick<FlowState, "perspective">, sp: SpeechConfig, zone: Zone): boolean {
+  return sp.side === state.perspective && zone === "own" && !!sp.prefixSeries.own;
+}
+
+/** Zone a card is shown in inside a column (a single-zone column shows every card in its only zone). */
+export function effectiveZone(perspective: SideId, sp: SpeechConfig, card: Pick<Card, "zone">): Zone {
+  const zones = zonesFor(perspective, sp);
+  return zones.length === 1 ? zones[0] : zones.includes(card.zone) ? card.zone : zones[zones.length - 1];
+}
+
+/** Speech index (0-based) in speaking order, or -1. */
+export function speechIndex(f: FormatConfig, id: string | null | undefined): number {
+  return id ? f.speeches.findIndex((s) => s.id === id) : -1;
 }

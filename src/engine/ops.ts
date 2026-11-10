@@ -2,13 +2,18 @@ import type { StageId } from "../config/types";
 import type { Card, FlowState, Point, Thesis } from "./types";
 
 /** Atomic changes. The sync layer applies the same ops to the Yjs document. Text edits go straight to Y.Text. */
-export type CardPatch = Partial<Omit<Card, "id" | "text" | "points">>;
+/** `respondsTo` is changed only through card.link / card.unlink (a Y.Array per card, safe on two devices). */
+export type CardPatch = Partial<Omit<Card, "id" | "text" | "points" | "respondsTo">>;
 export type ThesisPatch = Partial<Omit<Thesis, "id" | "title">>;
 
 export type Op =
   | { t: "card.create"; card: Card }
   | { t: "card.update"; id: string; patch: CardPatch }
   | { t: "card.delete"; id: string }
+  /** Adds a target to the end of a card's respondsTo (no duplicates). */
+  | { t: "card.link"; id: string; target: string }
+  /** Removes a target from a card's respondsTo. */
+  | { t: "card.unlink"; id: string; target: string }
   | { t: "point.insert"; cardId: string; index: number; point: Point }
   | { t: "point.delete"; cardId: string; pointId: string }
   | { t: "thesis.create"; thesis: Thesis }
@@ -31,6 +36,16 @@ function applyOp(s: FlowState, op: Op): FlowState {
       return { ...s, cards: s.cards.map((c) => (c.id === op.id ? { ...c, ...op.patch } : c)) };
     case "card.delete":
       return { ...s, cards: s.cards.filter((c) => c.id !== op.id) };
+    case "card.link":
+      return {
+        ...s,
+        cards: s.cards.map((c) => (c.id === op.id && !c.respondsTo.includes(op.target) ? { ...c, respondsTo: [...c.respondsTo, op.target] } : c)),
+      };
+    case "card.unlink":
+      return {
+        ...s,
+        cards: s.cards.map((c) => (c.id === op.id && c.respondsTo.includes(op.target) ? { ...c, respondsTo: c.respondsTo.filter((x) => x !== op.target) } : c)),
+      };
     case "point.insert":
       return {
         ...s,

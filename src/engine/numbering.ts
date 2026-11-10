@@ -1,13 +1,12 @@
 import type { FormatConfig, SpeechId } from "../config/types";
-import { byOrder } from "./order";
+import { byOrder, thesesOf } from "./order";
+import { layoutRows, numberingOrder, type RowLayout } from "./rows";
 import { zonesFor } from "./stages";
-import type { Card, FlowState, Thesis } from "./types";
+import type { Card, FlowState } from "./types";
 
-export function thesesOf(state: FlowState, side: string): Thesis[] {
-  return state.theses.filter((t) => t.side === side).sort(byOrder);
-}
+export { thesesOf };
 
-/** Cards of one column in on-screen order: clash zone, then own zone by thesis, then ungrouped. */
+/** Cards of one column in stage-1 order: clash zone, then own zone by thesis, then ungrouped (stacks and row starts use it). */
 export function columnOrder(f: FormatConfig, state: FlowState, speechId: SpeechId): Card[] {
   const speech = f.speeches.find((s) => s.id === speechId);
   if (!speech) return [];
@@ -34,12 +33,14 @@ const seriesKey = (c: Pick<Card, "side" | "series">) => `${c.side}|${c.series}`;
  * - locked cards keep their snapshot;
  * - live cards are numbered by position, continuing the series after every number already used
  *   in earlier columns and by locked cards in the same column (OC5 after LO's OC4, OA7 after OA6).
+ * Position = the lane's top-to-bottom row order (stage 2), with answers grouped by the speech they
+ * answer in `defaultTargets` order (see `numberingOrder`).
  */
-export function computeNumbers(f: FormatConfig, state: FlowState): Map<string, number> {
+export function computeNumbers(f: FormatConfig, state: FlowState, layout: RowLayout = layoutRows(f, state)): Map<string, number> {
   const numbers = new Map<string, number>();
   const running = new Map<string, number>();
   for (const speech of f.speeches) {
-    const cards = columnOrder(f, state, speech.id);
+    const cards = numberingOrder(f, state, layout, speech.id);
     for (const c of cards) {
       if (c.numberLocked && c.displayNumber != null) {
         numbers.set(c.id, c.displayNumber);

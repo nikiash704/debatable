@@ -1,6 +1,8 @@
 import type { FormatConfig, SideId, TagType } from "../config/types";
 import { computeBoard, type BoardVM } from "./board";
+import * as clash from "./clash";
 import * as cmd from "./commands";
+import { layoutRows } from "./rows";
 import { applyOps } from "./ops";
 import { planStageChange } from "./transitions";
 import type { FlowState, Zone } from "./types";
@@ -70,6 +72,28 @@ export class Sim {
     return this.board()
       .columns.find((c) => c.speech.id === speech)!
       .order.map((c) => c.label);
+  }
+
+  /** R: answer a card; returns the new card's id. */
+  answer(targetId: string, text = ""): string {
+    const r = this.run(clash.answerCard(this.f, this.state, targetId, this.newId));
+    if (!r.focus) throw new Error(`cannot answer ${targetId}: ${JSON.stringify(clash.answerPlace(this.f, this.state, targetId))}`);
+    const id = (r.focus as { id: string }).id;
+    if (text) this.state = { ...this.state, cards: this.state.cards.map((c) => (c.id === id ? { ...c, text } : c)) };
+    return id;
+  }
+
+  link(cardId: string, targetId: string) {
+    return this.run(clash.toggleLink(this.f, this.state, cardId, targetId));
+  }
+
+  rows() {
+    return layoutRows(this.f, this.state);
+  }
+
+  /** Row index of a card. */
+  row(id: string): number {
+    return this.rows().rowOf.get(id)!;
   }
 
   card$(id: string) {
