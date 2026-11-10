@@ -1,6 +1,12 @@
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 
-export type CardTone = "ours" | "neutral" | "red";
+/** ours = green border; said = green tint (our rebuttal); neutral = answered; unanswered = red; red = new — don't say. */
+export type CardTone = "ours" | "said" | "neutral" | "unanswered" | "red";
+
+export interface CardTarget {
+  label: string;
+  tone: CardTone;
+}
 
 export interface CardPointView {
   id: string;
@@ -8,6 +14,8 @@ export interface CardPointView {
   text: string;
   editor?: ReactNode;
   selected?: boolean;
+  /** Drag handle (points can be dragged inside a card and between cards). */
+  onPointerDown?: (e: ReactPointerEvent) => void;
 }
 
 export interface CardPlate {
@@ -35,11 +43,18 @@ export interface CardViewProps extends Omit<HTMLAttributes<HTMLDivElement>, "chi
   speech?: boolean;
   partner?: { name: string; color: string } | null;
   tools?: ReactNode;
+  /** "Responding to PM1, PM2" (answer links, mock "M3 Responding to G6"). */
+  responding?: CardTarget[];
+  /** Small mono line at the bottom ("said in LOC"). */
+  meta?: string | null;
+  /** Extra content after the card (e.g. the "no target · L" hint). */
+  hint?: ReactNode;
 }
 
 /**
- * Argument card (Figma 2:86). Tones: ours (green border), neutral ("Answered"), red ("Unanswered",
- * used in stage 1 only for "new — don't say" cards in our rebuttal).
+ * Argument card (Figma 2:86). Tones: ours (green border), neutral ("Answered"), unanswered (red, an
+ * opponent card nobody answered yet), red ("new — don't say" in our rebuttal, always with its label),
+ * said (green tint: said in a constructive, shown during our rebuttal).
  * Points are the mock's "1a, 1b" sub-rows, collapsed to the first one plus "•N".
  */
 export function CardView({
@@ -60,6 +75,9 @@ export function CardView({
   speech,
   partner,
   tools,
+  responding,
+  meta,
+  hint,
   className,
   style,
   ...rest
@@ -80,6 +98,14 @@ export function CardView({
   const showAll = expanded || anyPointEditing;
   const visible = showAll ? points : points.slice(0, 1);
   const more = points.length > 1;
+  const answering = !!responding && responding.length > 0;
+  const titleEl = editor ? (
+    <div className={`card__title${answering ? " card__title--block" : ""}`}>{editor}</div>
+  ) : (
+    <div className={`card__title${text ? "" : " card__title--empty"}${answering ? " card__title--block" : ""}`} data-testid="card-text">
+      {text || placeholder}
+    </div>
+  );
   const st: CSSProperties = partner ? { ...style, ["--partner-color" as string]: partner.color } : (style ?? {});
   return (
     <div className={cls} style={st} {...rest}>
@@ -98,12 +124,18 @@ export function CardView({
         <span className="card__badge" data-testid="card-label">
           {label}
         </span>
-        {editor ? (
-          <div className="card__title">{editor}</div>
+        {answering ? (
+          <span className="card__resp" data-testid="card-responding">
+            Responding to{" "}
+            {responding!.map((r, i) => (
+              <span key={`${r.label}-${i}`}>
+                {i > 0 && ", "}
+                <span className={`card__resp-id card__resp-id--${r.tone}`}>{r.label}</span>
+              </span>
+            ))}
+          </span>
         ) : (
-          <div className={`card__title${text ? "" : " card__title--empty"}`} data-testid="card-text">
-            {text || placeholder}
-          </div>
+          titleEl
         )}
         {strong && (
           <span className="card__star" aria-label="Strong" data-testid="card-strong">
@@ -111,6 +143,7 @@ export function CardView({
           </span>
         )}
       </div>
+      {answering && titleEl}
       {visible.length > 0 && (
         <div className="card__points">
           {visible.map((p, i) => (
@@ -119,6 +152,7 @@ export function CardView({
               className={`card__point${p.selected ? " card__point--selected" : ""}`}
               data-point-id={p.id}
               data-testid="card-point"
+              onPointerDown={p.editor ? undefined : p.onPointerDown}
             >
               <span className="card__point-id">{p.label}</span>
               {p.editor ? (
@@ -166,6 +200,12 @@ export function CardView({
           {tags}
         </div>
       )}
+      {meta && (
+        <div className="card__meta" data-testid="card-meta">
+          {meta}
+        </div>
+      )}
+      {hint}
     </div>
   );
 }

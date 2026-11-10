@@ -1620,3 +1620,501 @@ button.chip--alert:hover {
     top: -17px;
   }
 }
+
+/* =====================================================================
+   Stage 2 (clash): rows, arrows, focus, pick mode, counters, legend
+   ===================================================================== */
+
+/* The board is one grid: lanes are columns (subgrids), rows are shared, so an answer sits beside
+   what it answers without measuring. Each layout row has 4 tracks: label, thesis head, cards, footer. */
+.board-grid {
+  position: relative;
+  display: grid;
+  grid-auto-columns: max-content;
+  column-gap: var(--lane-gap);
+  padding: var(--board-pad-top) var(--board-pad-x) 120px;
+  width: max-content;
+  min-height: 100%;
+}
+
+.lane--grid {
+  grid-row: 1 / -1;
+  display: grid;
+  grid-template-rows: subgrid;
+  gap: 0;
+  transition: opacity 0.15s;
+}
+
+/* every lane item sits in the lane's single column (thesis lines overlap their cells) */
+.lane--grid > * {
+  grid-column: 1;
+}
+
+.lane--grid > .lane__head {
+  grid-row: 1;
+  padding-bottom: 10px;
+}
+
+.lane--grid > .lane__empty {
+  height: auto;
+  min-height: 560px;
+  align-self: start;
+}
+
+.lane--dim {
+  opacity: 0.45;
+}
+
+.lane__counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.lane__counters .lane__counter {
+  margin-top: 0;
+}
+
+.lane__counter--answers {
+  background: var(--c-fill-subtle);
+  color: var(--c-text-secondary);
+}
+
+.lane__counter-left {
+  color: var(--c-red-counter);
+  font-weight: 600;
+}
+
+.lane__counter-sep {
+  color: var(--c-text-muted);
+}
+
+.cell {
+  min-width: 0;
+}
+
+.cell--label {
+  padding: 2px 2px 6px;
+}
+
+.cell--main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.cell--foot {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0 10px;
+}
+
+.cell--thesis {
+  padding-left: 13px;
+}
+
+.cell--head {
+  padding-left: 13px;
+}
+
+/* A thesis: 2 px line on the left over the rows of its cards ("segment"), header on top. */
+.thesis-line {
+  grid-column: 1;
+  justify-self: start;
+  width: 0;
+  margin-left: 1px;
+  border-left: 2px solid var(--c-ours-border);
+  pointer-events: none;
+  margin-bottom: 8px;
+}
+
+.thesis-line--selected {
+  border-left-color: var(--c-ours-line);
+}
+
+.thesis__head--selected {
+  background: var(--c-fill-subtle);
+}
+
+.slot {
+  position: relative;
+}
+
+/* "+" insert target floating in the 8 px above a card (no layout space of its own). */
+.gap--float {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+
+/* ---------- Card tones and states (stage 2) ---------- */
+.card--unanswered {
+  background: var(--c-red-fill);
+  border-color: var(--c-red-border);
+}
+
+.card--unanswered .card__badge {
+  background: var(--c-red-badge-bg);
+  color: var(--c-red-badge-text);
+}
+
+.card--unanswered .card__point {
+  background: var(--c-red-sub-bg);
+}
+
+.card--unanswered .card__point-id {
+  color: var(--c-red-badge-text);
+}
+
+/* Our rebuttal: said in a constructive → green tint on the Ours look */
+.card--said {
+  background: var(--c-success-bg);
+  border-color: #86d9a6;
+}
+
+.card--said .card__point {
+  background: var(--c-ours-badge-bg);
+}
+
+.card__resp {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--c-text-tertiary);
+}
+
+.card__resp-id {
+  display: inline-block;
+  border-radius: var(--r-badge);
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 500;
+  background: var(--c-neutral-badge-bg);
+  color: var(--c-neutral-badge-text);
+}
+
+.card__resp-id--unanswered,
+.card__resp-id--red {
+  background: var(--c-red-badge-bg);
+  color: var(--c-red-badge-text);
+}
+
+.card__resp-id--ours,
+.card__resp-id--said {
+  background: var(--c-ours-badge-bg);
+  color: var(--c-ours-badge-text);
+}
+
+.card__title--block {
+  flex: none;
+  width: 100%;
+  padding-top: 0;
+}
+
+.card__meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--c-ours-badge-text);
+}
+
+.card__hint {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--c-text-muted);
+}
+
+.card__hint kbd {
+  font-family: var(--font-mono);
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* focus ring: the selected card's targets and the cards that answer it (this device only) */
+.card--focus {
+  border-color: var(--c-text-tertiary);
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.12);
+}
+
+.card--unanswered.card--focus {
+  border-color: var(--c-red-counter);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+
+/* both ends of a hovered / selected line */
+.card--hl {
+  border-color: var(--c-text-tertiary);
+}
+
+/* Link pick mode */
+.board--pick .card {
+  cursor: default;
+}
+
+.card--eligible {
+  cursor: pointer !important;
+  box-shadow: 0 0 0 2px rgba(67, 56, 202, 0.18);
+}
+
+.card--eligible:hover,
+.card--cursor {
+  box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.35);
+}
+
+.card--picked {
+  border-color: var(--c-poi-text);
+  box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.28);
+}
+
+.card--ineligible {
+  opacity: 0.35;
+}
+
+.card--pick-source {
+  border: 1.5px solid var(--c-poi-text);
+  padding: 9.5px 11.5px;
+}
+
+.pick-banner {
+  position: sticky;
+  top: 8px;
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: 8px auto -44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-card);
+  background: var(--c-poi-bg);
+  border: 1px solid #c7d2fe;
+  color: var(--c-poi-text);
+  font-size: 12px;
+  box-shadow: var(--sh-popover);
+}
+
+.tool--text {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 4px;
+}
+
+/* the toolbar grew (Answer, Link): it starts right of the "+" insert target above the card */
+.card__tools {
+  left: 28px;
+  right: auto;
+  gap: 0;
+}
+
+.card__tools .tool {
+  min-width: 22px;
+  padding: 0 4px;
+}
+
+.tool--off {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Clash lines (D1 / Clash arrow) ---------- */
+.arrows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.arrow {
+  --arrow: var(--c-text-muted);
+}
+
+.arrow--ours {
+  --arrow: var(--c-ours-line);
+}
+
+.arrow--red {
+  --arrow: var(--c-red-counter);
+}
+
+.arrow__line {
+  stroke: var(--arrow);
+  stroke-width: 1.25;
+  opacity: 0.75;
+}
+
+.arrow__head {
+  fill: none;
+  stroke: var(--arrow);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+.arrow__dot {
+  fill: var(--arrow);
+}
+
+.arrow--on .arrow__line,
+.arrow--on .arrow__head {
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.arrow__hit {
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.arrow-x {
+  position: absolute;
+  z-index: 6;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-input);
+  box-shadow: var(--sh-popover);
+  color: var(--c-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.arrow-x:hover {
+  color: var(--c-red-counter);
+  border-color: var(--c-red-border);
+}
+
+/* ---------- Legend (Figma 3:74 bottom right) ---------- */
+.legend {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  box-shadow: var(--sh-panel);
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  pointer-events: none;
+}
+
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legend__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.legend__note {
+  color: var(--c-text-muted);
+}
+
+/* ---------- Stage bar: "N unanswered" (Figma 3:22) ---------- */
+.unanswered {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--c-red-counter-border);
+  background: var(--c-red-counter-bg);
+  color: var(--c-red-counter-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 420px;
+  overflow: hidden;
+}
+
+.unanswered__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-red-counter);
+  flex: none;
+}
+
+.unanswered__ids {
+  display: inline-flex;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.unanswered__id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 4px;
+  border-radius: var(--r-badge);
+  color: var(--c-red-counter-text);
+}
+
+.unanswered__id:hover {
+  background: var(--c-red-badge-bg);
+}
+
+/* ---------- Board / Doc switch ---------- */
+.view-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--c-fill-subtle);
+  flex: none;
+}
+
+.view-switch__opt {
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.view-switch__opt[aria-checked="true"] {
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-weight: 600;
+  box-shadow: var(--sh-segment);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast__action {
+  color: #86efac;
+  font-weight: 600;
+}

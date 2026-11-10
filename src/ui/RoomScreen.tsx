@@ -148,11 +148,14 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
         onSetup={() => setSetupOpen((o) => !o)}
         onPalette={() => c.setPalette(true)}
         toast={toast}
+        view={c.ui.view}
+        onView={c.setView}
       />
       {showInvite && <InviteBanner code={entry.code} onDismiss={() => updateRoom(entry.code, { inviteDismissed: true })} toast={toast} />}
       <StageBar c={c} />
       <div className="app__body">
         <Board c={c} session={session} peers={peers} />
+        <Legend />
         {setupOpen && (
           <SetupPanel
             session={session}
@@ -173,6 +176,27 @@ function Room({ session, entry }: { session: RoomSession; entry: RoomEntry }) {
           {toastMsg}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Legend (Figma 3:74, bottom right). */
+function Legend() {
+  return (
+    <div className="legend" data-testid="legend" aria-label="Legend">
+      <span className="legend__item">
+        <span className="legend__dot" style={{ background: "var(--c-ours-line)" }} />
+        Ours · standing
+      </span>
+      <span className="legend__item">
+        <span className="legend__dot" style={{ background: "var(--c-red-counter)" }} />
+        Unanswered
+      </span>
+      <span className="legend__item">
+        <span className="legend__dot" style={{ background: "var(--c-text-muted)" }} />
+        Answered
+      </span>
+      <span className="legend__note">Line = response → argument it answers</span>
     </div>
   );
 }
@@ -201,6 +225,21 @@ function useCommands(c: Controller, extra: { openSetup: () => void; copyLink: ()
       { id: "outdent", label: "Level up (point → card, card → thesis)", hotkey: "Shift+Tab", group: "Cards", run: () => c.outdent(sel) },
     );
   }
+  list.push({ id: "view", label: c.ui.view === "board" ? "Doc view (outline for prep)" : "Board view", hotkey: "D", group: "View", run: c.toggleView });
+  if (card) {
+    const place = c.answerPlaceOf(card.card.id);
+    if (place.ok) list.push({ id: "answer", label: `Answer ${card.label}`, hotkey: "R", group: "Clash", run: () => c.answer(card.card.id) });
+    else list.push({ id: "answer", label: `Answer ${card.label} — ${place.reason}`, hotkey: "R", group: "Clash", run: () => undefined });
+    list.push({ id: "link", label: `Link ${card.label} to the arguments it answers…`, hotkey: "L", group: "Clash", run: () => c.startLink(card.card.id) });
+    card.targets.forEach((t, i) =>
+      list.push({ id: `unlink-${t}`, label: `Unlink ${card.label} → ${card.targetLabels[i]}`, hotkey: "L", group: "Clash", run: () => c.unlink(card.card.id, t) }),
+    );
+  }
+  if (c.ui.link) {
+    const l = c.ui.link;
+    list.push({ id: "unlink-selected", label: `Unlink ${c.board.cards.get(l.from)?.label} → ${c.board.cards.get(l.to)?.label}`, hotkey: "Del", group: "Clash", run: () => c.unlink(l.from, l.to) });
+  }
+  for (const v of c.board.unanswered.slice(0, 12)) list.push({ id: `goto-${v.card.id}`, label: `Go to unanswered ${v.label}`, group: "Clash", run: () => c.jumpTo(v.card.id) });
   if (card) {
     if (card.ours) list.push({ id: "said", label: card.card.saidIn ? "Mark not said" : "Mark said", hotkey: c.speechMode ? `Space · ${MOD}↵` : `${MOD}↵`, group: "Card", run: () => c.said(card.card.id) });
     list.push(
@@ -239,6 +278,21 @@ function useHotkeys(c: Controller, o: { setupOpen: boolean; closeSetup: () => vo
       }
       if (c.ui.palette || c.ui.picker) return;
       if (isTyping(e)) return;
+      // Link pick mode: arrows move between eligible cards, Enter / Space toggle, Esc ends
+      if (c.ui.pick) {
+        const dirs: Record<string, "up" | "down" | "left" | "right"> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+        if (dirs[e.key]) {
+          e.preventDefault();
+          c.pickMove(dirs[e.key]);
+        } else if ((e.key === "Enter" || e.key === " ") && c.ui.pick.cursor) {
+          e.preventDefault();
+          c.pickToggle(c.ui.pick.cursor);
+        } else if (e.key === "Escape" || e.key.toLowerCase() === "l") {
+          e.preventDefault();
+          c.endPick();
+        }
+        return;
+      }
       if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) c.redo();
@@ -260,10 +314,16 @@ function useHotkeys(c: Controller, o: { setupOpen: boolean; closeSetup: () => vo
       if (mod || e.altKey) return;
       const k = e.key;
       const handled = () => e.preventDefault();
+      if (c.ui.link && (k === "Delete" || k === "Backspace")) {
+        c.unlink(c.ui.link.from, c.ui.link.to);
+        c.selectLink(null);
+        return handled();
+      }
       switch (k) {
         case "Escape":
           if (c.ui.tagMenu) c.setTagMenu(null);
           else if (o.setupOpen) o.closeSetup();
+          else if (c.ui.link) c.selectLink(null);
           else c.select(null);
           return handled();
         case "ArrowUp":
@@ -315,7 +375,19 @@ function useHotkeys(c: Controller, o: { setupOpen: boolean; closeSetup: () => vo
         c.addBelow(cardId);
         return handled();
       }
+      if (key === "d") {
+        c.toggleView();
+        return handled();
+      }
       if (!cardId) return;
+      if (key === "r") {
+        c.answer(cardId);
+        return handled();
+      }
+      if (key === "l") {
+        c.startLink(cardId);
+        return handled();
+      }
       if (key === "s") {
         c.strong(cardId);
         return handled();

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormatConfig, TagType } from "../config/types";
 import {
   addPoint,
+  answerCard,
+  answerPlace,
   computeBoard,
   createCard,
   createCardBelow,
@@ -20,7 +22,10 @@ import {
   tagAvailable,
   toggleSaid,
   toggleStrong,
+  toggleLink,
   toggleTag,
+  unlinkCard,
+  type AnswerPlace,
   type BoardVM,
   type ColumnVM,
   type Focus,
@@ -31,6 +36,8 @@ import type { FlowState } from "../engine/types";
 import { randomId } from "../sync/storage";
 import type { RoomSession } from "../sync/session";
 
+export type View = "board" | "doc";
+
 export interface UiState {
   selection: Focus | null;
   editing: boolean;
@@ -39,20 +46,27 @@ export interface UiState {
   picker: { cardId: string; type: "same-as" | "contradicts" } | null;
   tagMenu: string | null;
   palette: boolean;
+  /** Board or Doc view (this device only). */
+  view: View;
+  /** Link pick mode (this device only): the card being linked and the keyboard cursor. */
+  pick: { cardId: string; cursor: string | null } | null;
+  /** Selected arrow (shows its × for touch / keyboard). */
+  link: { from: string; to: string } | null;
 }
 
 const newId = () => randomId(12);
 
-/** Keyboard navigation items of a column, in on-screen order. */
-export type NavItem = { kind: "card"; id: string } | { kind: "thesis"; id: string };
+/** Keyboard navigation items of a lane, top to bottom (rows), with the row each one sits in. */
+export type NavItem = { kind: "card"; id: string; row: number } | { kind: "thesis"; id: string; row: number };
 
-export function navItems(col: ColumnVM, speechOnly: boolean): NavItem[] {
+export function navItems(col: ColumnVM, speechOnly: boolean, board: BoardVM): NavItem[] {
   const out: NavItem[] = [];
-  for (const z of col.zones) {
-    for (const g of z.groups) {
-      if (g.thesis && !speechOnly) out.push({ kind: "thesis", id: g.thesis.id });
-      for (const c of g.cards) out.push({ kind: "card", id: c.card.id });
-    }
+  const rows = board.layout.rows;
+  const segAt = new Map<number, string[]>();
+  if (!speechOnly) for (const g of col.lane.segments) segAt.set(g.from, [...(segAt.get(g.from) ?? []), g.thesisId]);
+  for (let i = 0; i < rows.length; i++) {
+    for (const t of segAt.get(i) ?? []) out.push({ kind: "thesis", id: t, row: i });
+    for (const id of rows[i].cells.get(col.speech.id) ?? []) out.push({ kind: "card", id, row: i });
   }
   return out;
 }
@@ -95,11 +109,27 @@ export interface Controller {
   columnOfFocus: (focus: Focus | null) => string | null;
   /** Speech-mode tap: toggles said and selects the next card. */
   speechTap: (cardId: string) => void;
+  /** Card the selection is on (card or one of its points). */
+  selectedCardId: string | null;
+  /** R / "↩ Answer": where an answer to this card would go, or why it cannot. */
+  answerPlaceOf: (cardId: string) => AnswerPlace;
+  answer: (cardId?: string | null) => void;
+  /** L / "Link": pick mode for a card. */
+  startLink: (cardId?: string | null) => void;
+  endPick: () => void;
+  pickToggle: (targetId: string) => void;
+  pickMove: (dir: "up" | "down" | "left" | "right") => void;
+  unlink: (from: string, to: string) => void;
+  selectLink: (link: { from: string; to: string } | null) => void;
+  setView: (v: View) => void;
+  toggleView: () => void;
+  /** Select a card and bring it into view (unanswered pill). */
+  jumpTo: (cardId: string) => void;
 }
 
 export function useController(session: RoomSession, f: FormatConfig, flow: FlowState, role: string | null): Controller {
   const board = useMemo(() => computeBoard(f, flow), [f, flow]);
-  const [ui, setUi] = useState<UiState>({
+  const [ui, setUi] = useState<UiState>(() => ({
     selection: null,
     editing: false,
     expanded: new Set(),
@@ -107,7 +137,11 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     picker: null,
     tagMenu: null,
     palette: false,
-  });
+    // the round opens in the Doc view during Prep (spec 02 requirement 1)
+    view: flow.stage === f.prepStage.id ? "doc" : "board",
+    pick: null,
+    link: null,
+  }));
   const flowRef = useRef(flow);
   flowRef.current = flow;
   const boardRef = useRef(board);
@@ -115,14 +149,16 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
   const uiRef = useRef(ui);
   uiRef.current = ui;
 
-  // Manual speech-mode override lasts for one stage.
+  // Manual speech-mode override lasts for one stage. Entering Prep opens the Doc view, leaving it the Board.
   const lastStage = useRef(flow.stage);
   useEffect(() => {
     if (lastStage.current !== flow.stage) {
+      const wasPrep = lastStage.current === f.prepStage.id;
+      const isPrep = flow.stage === f.prepStage.id;
       lastStage.current = flow.stage;
-      setUi((u) => ({ ...u, speechOverride: null }));
+      setUi((u) => ({ ...u, speechOverride: null, view: isPrep ? "doc" : wasPrep ? "board" : u.view, pick: null }));
     }
-  }, [flow.stage]);
+  }, [flow.stage, f.prepStage.id]);
 
   // Drop selection if the item disappeared (deleted here or by the partner).
   useEffect(() => {
@@ -134,6 +170,12 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
       (sel.kind === "point" && !board.cards.get(sel.cardId)?.card.points.some((p) => p.id === sel.pointId));
     if (gone) setUi((u) => ({ ...u, selection: null, editing: false }));
   }, [board, flow.theses, ui.selection]);
+
+  // Pick mode / selected arrow end when their card or link disappears.
+  useEffect(() => {
+    if (ui.pick && !board.cards.has(ui.pick.cardId)) setUi((u) => ({ ...u, pick: null }));
+    if (ui.link && !board.links.some((l) => l.from === ui.link!.from && l.to === ui.link!.to)) setUi((u) => ({ ...u, link: null }));
+  }, [board, ui.pick, ui.link]);
 
   // Share what we are typing in, so the partner sees the card highlighted in our colour.
   useEffect(() => {
@@ -157,7 +199,7 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
   const select = useCallback(
     (focus: Focus | null, edit = false) => {
       session.endUndoStep();
-      setUi((u) => ({ ...u, selection: focus, editing: !!focus && edit, tagMenu: null }));
+      setUi((u) => ({ ...u, selection: focus, editing: !!focus && edit, tagMenu: null, link: null }));
     },
     [session],
   );
@@ -262,8 +304,9 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     const b = boardRef.current;
     if (focus.kind === "card") return b.cards.get(focus.id)?.card.ownerSpeech ?? null;
     if (focus.kind === "point") return b.cards.get(focus.cardId)?.card.ownerSpeech ?? null;
-    const col = b.columns.find((c) => c.zones.some((z) => z.groups.some((g) => g.thesis?.id === focus.id)) && c.state === "live");
-    return (col ?? b.columns.find((c) => c.zones.some((z) => z.groups.some((g) => g.thesis?.id === focus.id))))?.speech.id ?? null;
+    const has = (c: ColumnVM) => c.lane.segments.some((g) => g.thesisId === focus.id);
+    const col = b.columns.find((c) => has(c) && c.state === "live");
+    return (col ?? b.columns.find(has))?.speech.id ?? null;
   }, []);
 
   /** Item above/below in the same column (for focus after deletes). */
@@ -272,7 +315,7 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
       const colId = columnOfFocus(focus);
       const col = boardRef.current.columns.find((c) => c.speech.id === colId);
       if (!col) return null;
-      const items = navItems(col, false);
+      const items = navItems(col, false, boardRef.current);
       const id = focus.kind === "point" ? focus.cardId : focus.id;
       const i = items.findIndex((x) => x.id === id);
       const n = items[i + dir];
@@ -319,12 +362,17 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     [f, run],
   );
 
+  /**
+   * ↑/↓ follow a lane's visual order (rows); ←/→ go to the nearest card in the same row of the next
+   * lane, or to the nearest row when that slot is empty. Speech mode keeps only the speech's cards.
+   */
   const move = useCallback(
     (dir: "up" | "down" | "left" | "right") => {
       const b = boardRef.current;
       const u = uiRef.current;
       const speechOnly = speechMode;
-      const cols = b.columns.filter((c) => c.order.length > 0 || c.zones.some((z) => z.groups.some((g) => g.thesis)));
+      const nav = (col: ColumnVM) => navItems(col, speechOnly && col.speech.id === speechColumn, b);
+      const cols = b.columns.filter((c) => nav(c).length > 0);
       if (!cols.length) return;
       const sel = u.selection;
       const colId = sel ? columnOfFocus(sel) : null;
@@ -332,11 +380,11 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
       if (ci < 0) {
         const preferred = cols.findIndex((c) => (speechColumn ? c.speech.id === speechColumn : c.current));
         ci = preferred >= 0 ? preferred : 0;
-        const items = navItems(cols[ci], speechOnly && cols[ci].speech.id === speechColumn);
+        const items = nav(cols[ci]);
         if (items[0]) setUi((s) => ({ ...s, selection: { kind: items[0].kind, id: items[0].id }, editing: false }));
         return;
       }
-      const items = navItems(cols[ci], speechOnly && cols[ci].speech.id === speechColumn);
+      const items = nav(cols[ci]);
       const curId = sel?.kind === "point" ? sel.cardId : sel?.id;
       const idx = Math.max(0, items.findIndex((x) => x.id === curId));
       if (dir === "up" || dir === "down") {
@@ -346,9 +394,18 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
       }
       const nci = ci + (dir === "left" ? -1 : 1);
       if (nci < 0 || nci >= cols.length) return;
-      const nItems = navItems(cols[nci], speechOnly && cols[nci].speech.id === speechColumn);
-      const n = nItems[Math.min(idx, nItems.length - 1)];
-      if (n) setUi((s) => ({ ...s, selection: { kind: n.kind, id: n.id }, editing: false }));
+      const row = items[idx]?.row ?? 0;
+      const nItems = nav(cols[nci]).filter((x) => x.kind === "card" || speechOnly === false);
+      let best: NavItem | null = null;
+      for (const x of nItems) {
+        // same row first (first card of the stack), then the nearest row (the upper one on a tie)
+        if (!best || Math.abs(x.row - row) < Math.abs(best.row - row) || (Math.abs(x.row - row) === Math.abs(best.row - row) && x.row < best.row)) best = x;
+        if (x.row === row && x.kind === "card") {
+          best = x;
+          break;
+        }
+      }
+      if (best) setUi((s) => ({ ...s, selection: { kind: best!.kind, id: best!.id }, editing: false }));
     },
     [columnOfFocus, speechMode, speechColumn],
   );
@@ -386,12 +443,97 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
       run(toggleSaid(f, flowRef.current, cardId));
       const col = boardRef.current.columns.find((c) => c.speech.id === speechColumn);
       if (!col) return;
-      const items = navItems(col, true);
+      const items = navItems(col, true, boardRef.current);
       const i = items.findIndex((x) => x.id === cardId);
       const n = items[i + 1] ?? items[i];
       if (n) setUi((s) => ({ ...s, selection: { kind: "card", id: n.id }, editing: false }));
     },
     [f, run, speechColumn],
+  );
+
+  const selectedCardId = ui.selection?.kind === "card" ? ui.selection.id : ui.selection?.kind === "point" ? ui.selection.cardId : null;
+  const selCardRef = useRef(selectedCardId);
+  selCardRef.current = selectedCardId;
+
+  const answerPlaceOf = useCallback((cardId: string) => answerPlace(f, flowRef.current, cardId), [f]);
+
+  const answer = useCallback(
+    (cardId?: string | null) => {
+      const id = cardId ?? selCardRef.current;
+      if (!id) return;
+      run(answerCard(f, flowRef.current, id, newId));
+    },
+    [f, run],
+  );
+
+  const startLink = useCallback(
+    (cardId?: string | null) => {
+      const id = cardId ?? selCardRef.current;
+      if (!id || !boardRef.current.cards.has(id)) return;
+      session.endUndoStep();
+      const first = boardRef.current.cards.get(id)!.targets[0] ?? null;
+      setUi((u) => ({ ...u, pick: { cardId: id, cursor: first }, editing: false, selection: { kind: "card", id }, tagMenu: null, link: null }));
+    },
+    [session],
+  );
+
+  const endPick = useCallback(() => setUi((u) => ({ ...u, pick: null })), []);
+
+  const pickToggle = useCallback(
+    (targetId: string) => {
+      const p = uiRef.current.pick;
+      if (!p) return;
+      run(toggleLink(f, flowRef.current, p.cardId, targetId));
+      setUi((u) => (u.pick ? { ...u, pick: { ...u.pick, cursor: targetId } } : u));
+    },
+    [f, run],
+  );
+
+  /** Arrow keys in pick mode: move the cursor between eligible cards (lanes left / right, rows up / down). */
+  const pickMove = useCallback(
+    (dir: "up" | "down" | "left" | "right") => {
+      const p = uiRef.current.pick;
+      if (!p) return;
+      const b = boardRef.current;
+      const src = b.cards.get(p.cardId)?.card;
+      if (!src) return;
+      const lanes = b.columns
+        .map((col) => col.order.filter((v) => v.card.id !== src.id && v.card.side !== src.side && f.speeches.findIndex((s) => s.id === v.card.ownerSpeech) < f.speeches.findIndex((s) => s.id === src.ownerSpeech)))
+        .filter((l) => l.length);
+      if (!lanes.length) return;
+      let li = lanes.findIndex((l) => l.some((v) => v.card.id === p.cursor));
+      if (li < 0) {
+        setUi((u) => (u.pick ? { ...u, pick: { ...u.pick, cursor: lanes[lanes.length - 1][0].card.id } } : u));
+        return;
+      }
+      const i = lanes[li].findIndex((v) => v.card.id === p.cursor);
+      let next = p.cursor;
+      if (dir === "up") next = lanes[li][Math.max(0, i - 1)].card.id;
+      else if (dir === "down") next = lanes[li][Math.min(lanes[li].length - 1, i + 1)].card.id;
+      else {
+        const row = b.layout.rowOf.get(p.cursor!) ?? 0;
+        li = Math.max(0, Math.min(lanes.length - 1, li + (dir === "left" ? -1 : 1)));
+        next = lanes[li].reduce((best, v) => (Math.abs((b.layout.rowOf.get(v.card.id) ?? 0) - row) < Math.abs((b.layout.rowOf.get(best.card.id) ?? 0) - row) ? v : best)).card.id;
+      }
+      setUi((u) => (u.pick ? { ...u, pick: { ...u.pick, cursor: next } } : u));
+    },
+    [f],
+  );
+
+  const unlink = useCallback((from: string, to: string) => run(unlinkCard(flowRef.current, from, to)), [run]);
+  const selectLink = useCallback((link: { from: string; to: string } | null) => setUi((u) => ({ ...u, link })), []);
+  const setView = useCallback((v: View) => setUi((u) => ({ ...u, view: v, pick: null, tagMenu: null })), []);
+  const toggleView = useCallback(() => setUi((u) => ({ ...u, view: u.view === "board" ? "doc" : "board", pick: null, tagMenu: null })), []);
+
+  const jumpTo = useCallback(
+    (cardId: string) => {
+      session.endUndoStep();
+      setUi((u) => ({ ...u, view: "board", selection: { kind: "card", id: cardId }, editing: false, pick: null }));
+      requestAnimationFrame(() =>
+        document.querySelector(`[data-card-id="${cardId}"]`)?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" }),
+      );
+    },
+    [session],
   );
 
   return {
@@ -431,5 +573,17 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
     redo,
     columnOfFocus,
     speechTap,
+    selectedCardId,
+    answerPlaceOf,
+    answer,
+    startLink,
+    endPick,
+    pickToggle,
+    pickMove,
+    unlink,
+    selectLink,
+    setView,
+    toggleView,
+    jumpTo,
   };
 }

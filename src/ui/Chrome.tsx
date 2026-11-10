@@ -68,10 +68,12 @@ interface TopBarProps {
   onSetup: () => void;
   onPalette: () => void;
   toast: (msg: string) => void;
+  view: "board" | "doc";
+  onView: (v: "board" | "doc") => void;
 }
 
 /** Top bar (Figma 3:3): brand, motion, side/role/partner, round code with copy, rounds, have-a-code field. */
-export function TopBar({ code, motion, f, side, role, me, peers, status, onSetup, onPalette, toast }: TopBarProps) {
+export function TopBar({ code, motion, f, side, role, me, peers, status, onSetup, onPalette, toast, view, onView }: TopBarProps) {
   const partner = peers[0];
   const statusText =
     status === "synced" ? "Synced" : status === "connecting" ? "Connecting…" : status === "offline" ? "Offline · saved here" : status === "local" ? "Saved on this device" : "Loading…";
@@ -92,6 +94,23 @@ export function TopBar({ code, motion, f, side, role, me, peers, status, onSetup
         {motion || "Add the motion…"}
       </button>
       <span className="topbar__spacer" />
+      <div className="view-switch" role="radiogroup" aria-label="View" data-testid="view-switch">
+        {(["board", "doc"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            className="view-switch__opt"
+            aria-checked={view === v}
+            data-testid={`view-${v}`}
+            data-tip={v === "board" ? "Board: all speeches, clash lines" : "Doc: outline of our case for prep"}
+            data-key="D"
+            onClick={() => onView(v)}
+          >
+            {v === "board" ? "Board" : "Doc"}
+          </button>
+        ))}
+      </div>
       <span className={`sync${status === "synced" ? "" : " sync--offline"}`} data-testid="sync-status" data-status={status}>
         {statusText}
       </span>
@@ -294,8 +313,30 @@ export function InviteBanner({ code, onDismiss, toast }: { code: string; onDismi
   );
 }
 
-/** Stage bar (Figma 3:22): stepper, speech mode, back / next. Timer, POI status and counters come later. */
-export function StageBar({ c }: { c: Controller }) {
+/** "3 unanswered G3 · G6 · G8" (Figma 3:22): click an ID to jump to that card. */
+function UnansweredPill({ c }: { c: Controller }) {
+  const list = c.board.unanswered;
+  if (!list.length) return null;
+  return (
+    <div className="unanswered" data-testid="unanswered-pill" role="status">
+      <span className="unanswered__dot" />
+      <span data-testid="unanswered-count">{list.length} unanswered</span>
+      <span className="unanswered__ids">
+        {list.map((v, i) => (
+          <span key={v.card.id} style={{ display: "contents" }}>
+            {i > 0 && <span style={{ color: "var(--c-red-border)" }}>·</span>}
+            <button type="button" className="unanswered__id" data-testid={`unanswered-${v.label}`} data-tip={`Go to ${v.label}: ${v.card.text || "…"}`} onClick={() => c.jumpTo(v.card.id)}>
+              {v.label}
+            </button>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** Stage bar (Figma 3:22): stepper, prep timer (Prep), speech mode, unanswered, back / next. */
+export function StageBar({ c, timer }: { c: Controller; timer?: React.ReactNode }) {
   const f = c.f;
   const stage = c.flow.stage;
   const idx = stageIndex(f, stage);
@@ -306,6 +347,8 @@ export function StageBar({ c }: { c: Controller }) {
     <div className="stagebar" data-testid="stagebar" data-stage={stage}>
       <StageStepper steps={c.board.steps} onPick={(id) => c.goStage(id)} />
       <span className="stagebar__spacer" />
+      {timer}
+      <UnansweredPill c={c} />
       {c.canSpeechMode && (
         <button
           type="button"
