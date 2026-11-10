@@ -1,0 +1,83 @@
+/* Design tokens: D1 · Clean SaaS (Figma AlPJWa4eWeuptbigOL3QS3). See docs/design-ref/README.md. */
+:root {
+  /* Base */
+  --c-page: #f7f7f8;
+  --c-surface: #ffffff;
+  --c-border: #e6e6ea;
+  --c-border-input: #d4d4d8;
+  --c-border-dashed: #e4e4e7;
+  --c-fill-subtle: #f4f4f5;
+  --c-text: #18181b;
+  --c-text-label: #3f3f46;
+  --c-text-secondary: #52525b;
+  --c-text-tertiary: #71717a;
+  --c-text-muted: #a1a1aa;
+  --c-text-faint: #d4d4d8;
+  --c-text-empty: #c4c4cc;
+  --c-ink: #18181b;
+  --c-on-ink: #ffffff;
+
+  /* Ours (green): standing arguments */
+  --c-ours-border: #bbe7cb;
+  --c-ours-badge-bg: #e8f7ee;
+  --c-ours-badge-text: #15803d;
+  --c-ours-sub-bg: #f4fbf6;
+  --c-ours-line: #16a34a;
+  --c-ours-live: #22c55e;
+  --c-ours-ring: rgba(23, 163, 74, 0.18);
+  --c-success-bg: #f0fdf4;
+  --c-success-text-2: #4d7c5a;
+
+  /* Unanswered / red */
+  --c-red-fill: #fff6f6;
+  --c-red-border: #f3b4b4;
+  --c-red-badge-bg: #fde2e2;
+  --c-red-badge-text: #c62828;
+  --c-red-sub-bg: #fdecec;
+  --c-red-counter: #dc2626;
+  --c-red-counter-bg: #fef2f2;
+  --c-red-counter-border: #fecaca;
+  --c-red-counter-text: #b91c1c;
+
+  /* Answered / neutral */
+  --c-neutral-fill: #fafafa;
+  --c-neutral-border: #e6e6ea;
+  --c-neutral-badge-bg: #efeff2;
+  --c-neutral-badge-text: #71717a;
+  --c-neutral-sub-bg: #f3f3f5;
+  --c-neutral-title: #52525b;
+  --c-neutral-body: #71717a;
+
+  /* Alert (POO) and POI */
+  --c-alert-bg: #fff7ed;
+  --c-alert-border: #fdba74;
+  --c-alert-text: #c2410c;
+  --c-poi-bg: #eef2ff;
+  --c-poi-text: #4338ca;
+
+  /* Type */
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Radius */
+  --r-badge: 4px;
+  --r-control: 6px;
+  --r-card: 8px;
+  --r-panel: 12px;
+
+  /* Shadows */
+  --sh-card: 0 1px 1px rgba(0, 0, 0, 0.04);
+  --sh-panel: 0 8px 24px rgba(23, 23, 28, 0.06);
+  --sh-popover: 0 8px 20px rgba(23, 23, 28, 0.1);
+  --sh-tooltip: 0 6px 16px rgba(23, 23, 28, 0.18);
+  --sh-segment: 0 1px 3px rgba(23, 23, 28, 0.08);
+
+  /* Layout */
+  --topbar-h: 52px;
+  --stagebar-h: 56px;
+  --lane-w: 240px;
+  --lane-gap: 40px;
+  --lane-future-w: 100px;
+  --board-pad-x: 16px;
+  --board-pad-top: 14px;
+}
