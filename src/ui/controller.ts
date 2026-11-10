@@ -154,24 +154,27 @@ export function useController(session: RoomSession, f: FormatConfig, flow: FlowS
   const speechMode = canSpeechMode && (ui.speechOverride ?? auto);
   const speechColumn = speechMode && current ? current.id : null;
 
-  const select = useCallback((focus: Focus | null, edit = false) => {
-    setUi((u) => ({ ...u, selection: focus, editing: !!focus && edit, tagMenu: null }));
-  }, []);
+  const select = useCallback(
+    (focus: Focus | null, edit = false) => {
+      session.endUndoStep();
+      setUi((u) => ({ ...u, selection: focus, editing: !!focus && edit, tagMenu: null }));
+    },
+    [session],
+  );
 
-  const stopEditing = useCallback(() => setUi((u) => ({ ...u, editing: false })), []);
+  const stopEditing = useCallback(() => {
+    session.endUndoStep();
+    setUi((u) => ({ ...u, editing: false }));
+  }, [session]);
 
   const run = useCallback(
     (r: Result) => {
       if (r.ops.length) session.apply(r.ops);
       if (r.focus) {
+        // A card shows all its points while one is being edited and folds back to the first one
+        // plus "•N" afterwards (spec 02: points collapsed, expanded on click).
         const focus = r.focus;
-        const expandCard = focus.kind === "point" ? focus.cardId : null;
-        setUi((u) => ({
-          ...u,
-          selection: focus,
-          editing: !!focus.edit,
-          expanded: expandCard ? new Set([...u.expanded, expandCard]) : u.expanded,
-        }));
+        setUi((u) => ({ ...u, selection: focus, editing: !!focus.edit }));
       }
     },
     [session],

@@ -84,7 +84,16 @@ export function CardView({
   return (
     <div className={cls} style={st} {...rest}>
       {partner && !editing && <span className="card__partner">{partner.name}</span>}
-      {tools && <div className="card__tools" onPointerDown={(e) => e.stopPropagation()}>{tools}</div>}
+      {tools && (
+        <div
+          className="card__tools"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {tools}
+        </div>
+      )}
       <div className="card__head">
         <span className="card__badge" data-testid="card-label">
           {label}

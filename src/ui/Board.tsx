@@ -309,10 +309,8 @@ const CardItem = memo(function CardItem({ vm, col, c, session, peers }: { vm: Ca
           e.stopPropagation();
           // double-click on a point edits that point, anywhere else the card text
           const row = (e.target as HTMLElement).closest?.("[data-point-id]") as HTMLElement | null;
-          if (row?.dataset.pointId) {
-            if (!expanded) c.toggleExpand(card.id);
-            c.select({ kind: "point", cardId: card.id, pointId: row.dataset.pointId }, true);
-          } else c.select({ kind: "card", id: card.id }, true);
+          if (row?.dataset.pointId) c.select({ kind: "point", cardId: card.id, pointId: row.dataset.pointId }, true);
+          else c.select({ kind: "card", id: card.id }, true);
         }}
         editor={
           ytext ? (

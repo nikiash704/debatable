@@ -670,25 +670,34 @@ button:disabled {
   flex: none;
 }
 
+/* "+" sits at the left edge, clear of the card toolbar (right-aligned). */
 .gap__btn {
   position: absolute;
-  inset: -3px 0;
+  left: 0;
+  top: -3px;
+  bottom: -3px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   transition: opacity 0.1s;
-  z-index: 2;
+  z-index: 1;
 }
 
-.gap__btn::before {
+.gap::after {
   content: "";
   position: absolute;
-  left: 8px;
+  left: 22px;
   right: 8px;
   top: 50%;
   height: 1px;
   background: var(--c-ours-line);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gap:hover::after {
   opacity: 0.5;
 }
 
@@ -809,6 +818,15 @@ button:disabled {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+  /* above the invisible "+" insert targets that overlap card edges */
+  z-index: 2;
+}
+
+.card:hover,
+.card--selected,
+.card--editing,
+.card--partner {
+  z-index: 3;
 }
 
 .card--neutral {

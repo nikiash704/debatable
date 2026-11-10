@@ -127,8 +127,16 @@ export class RoomSession {
 
   /** Local ops refresh the snapshot synchronously, so the UI can select what was just created. */
   apply(ops: Op[]) {
+    // every command is its own undo step (typing is grouped separately, see endUndoStep)
+    this.undo.stopCapturing();
     applyOpsToDoc(this.doc, this.snapshot.side, ops, LOCAL);
+    this.undo.stopCapturing();
     this.refresh();
+  }
+
+  /** Closes the current undo step (when editing starts or stops). */
+  endUndoStep() {
+    this.undo.stopCapturing();
   }
 
   private dirty = false;

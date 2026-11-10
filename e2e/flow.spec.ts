@@ -244,6 +244,7 @@ test("criterion 8: every card action by mouse and by hotkey, with visible hotkey
   await expect(page.getByRole("tooltip").locator("kbd")).toHaveText("]");
 
   // strong: mouse + S
+  await card(page, "PM2").hover();
   await card(page, "PM2").getByTestId("tool-strong").click();
   await expect(card(page, "PM2").getByTestId("card-strong")).toBeVisible();
   await card(page, "PM3").click();
@@ -281,22 +282,26 @@ test("criterion 8: every card action by mouse and by hotkey, with visible hotkey
   await card(page, "OC1").getByTestId("tool-said").click();
   await expect(card(page, "OC1")).toHaveAttribute("data-said", "false");
 
-  // new card: A (below the selected one) and Enter while typing; delete: Del and ✕
-  await card(page, "OC1").click();
+  // new card: A (below the selected one — OC1 is still selected) and Enter while typing; delete: Del and ✕
+  await expect(card(page, "OC1")).toHaveClass(/card--selected/);
   await page.keyboard.press("a");
   await typeAndEscape(page, "Second response");
   await expect(card(page, "OC2")).toContainText("Second response");
   await card(page, "OC2").getByTestId("tool-delete").click();
   await expect(card(page, "OC2")).toHaveCount(0);
 
-  // edit: Enter on the selected card; double-click; Esc leaves editing
-  await card(page, "OC1").click();
+  // edit: Enter on the selected card (the selection moved to OC1 after the delete); Esc leaves editing
+  await expect(card(page, "OC1")).toHaveClass(/card--selected/);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("card-editor")).toBeFocused();
   await page.keyboard.press("End");
   await page.keyboard.type("!");
   await page.keyboard.press("Escape");
   await expect(card(page, "OC1")).toContainText("Unexplored is not more valuable!");
+  // double-click edits too (and a click on an already selected card, for touch)
+  await card(page, "OC1").dblclick();
+  await expect(page.getByTestId("card-editor")).toBeFocused();
+  await page.keyboard.press("Escape");
   // undo
   await page.keyboard.press(`${MOD}+z`);
   await expect(card(page, "OC1").getByTestId("card-text")).toHaveText("Unexplored is not more valuable");
