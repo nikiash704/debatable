@@ -1,6 +1,6 @@
 # Debatable: project context
 
-Smart note-taking ("flowing") app for parliamentary debate tournaments.
+Smart note-taking ("flowing") app for parliamentary debate practice.
 
 ## Domain
 - Formats: American Parliamentary (APDA), Asian Parliamentary (AP) and
@@ -17,9 +17,6 @@ Smart note-taking ("flowing") app for parliamentary debate tournaments.
   - Prep: 15 minutes. "Cases" tournaments (Gov brings its own case; Opp may make
     a tight call at the very start of the LOC, or spec calls) vs "motions"
     tournaments (motion released; types THBT, THW, THS/THO, THP, THPAW).
-  - No internet or generative AI during prep or the round. Core flowing must work
-    fully offline with AI switched off; AI features are for post-round review and
-    practice only, never live in a tournament round.
 - AP: Government (PM, DPM, Gov Whip) vs Opposition (LO, DLO, Opp Whip),
   then Opp reply, then Gov reply. Reply speeches are given by the 1st or 2nd speaker.
 - BP: Opening Government (PM, DPM), Opening Opposition (LO, DLO),

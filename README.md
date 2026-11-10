@@ -1,7 +1,7 @@
 # Debatable
 
 A smart note-taking (flowing) app for competitive parliamentary debating,
-built for tournament use.
+built for practice rounds and training.
 
 ## Supported formats
 
