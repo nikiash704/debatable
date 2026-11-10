@@ -128,6 +128,8 @@ test("offline-first: edits are kept on the device and sync when the network is b
   await expect(a.page.getByTestId("sync-status")).toHaveAttribute("data-status", "offline");
   await a.page.getByTestId("add-LOC-clash").click();
   await typeAndEscape(a.page, "Written offline");
+  // the device copy is written (reloading in the same instant can abort IndexedDB writes still in flight)
+  await a.page.evaluate(() => (window as unknown as { __debatable: { whenStored(): Promise<void> } }).__debatable.whenStored());
   // reload with the server unreachable: the card comes back from the device (IndexedDB)
   let online = false;
   await a.page.routeWebSocket(/\/parties\//, (ws) => {

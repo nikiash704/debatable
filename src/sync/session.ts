@@ -134,6 +134,23 @@ export class RoomSession {
     this.refresh();
   }
 
+  /**
+   * Resolves once every local change made so far is written to IndexedDB. Read-write transactions on one
+   * store run in the order they were created, so an empty one completes only after all earlier writes.
+   */
+  whenStored(): Promise<void> {
+    const db = (this.idb as unknown as { db: IDBDatabase | null }).db;
+    if (!db) return this.idb.whenSynced.then(() => this.whenStored());
+    return new Promise((resolve) => {
+      try {
+        const t = db.transaction(["updates"], "readwrite");
+        t.oncomplete = t.onabort = t.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
   /** Prep timer actions (synced room state). */
   setPrepTimer(value: unknown) {
     setPrepTimer(this.doc, value);

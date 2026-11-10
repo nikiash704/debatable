@@ -56,6 +56,10 @@ Live app: **https://debatable.nikiash704.workers.dev**
 - `e2e/rooms.spec.ts` "two devices": one added line `showView(b.page, "board")` after B joins by code
   (B opens the round in Prep → Doc view).
 - `e2e/flow.spec.ts` "touch": one added tap on the Board switch after opening a new round (same reason).
+- `e2e/rooms.spec.ts` "offline-first": one added line that waits until the edits are written to IndexedDB
+  (`session.whenStored()`, new) before reloading. The test reloaded in the same instant typing ended, and the
+  browser aborts IndexedDB writes still queued at that moment. The stage-1 build fails it now and then too
+  (checked: 1 of 3 runs, last keystrokes lost); stage 2's heavier render per keystroke made it fail every time.
 - No expectation about lane order, numbers or colours had to change: rounds without links lay out exactly
   as in stage 1, and "Unanswered" red uses its own class (`card--unanswered`), so stage 1's
   `.card--red` / `data-red` checks still mean "new — don't say".
@@ -98,3 +102,6 @@ SQLite-backed Durable Objects). The laptop is logged in (`wrangler login`); a cl
 - Final participant-name list (spec 01).
 - Stylus input and AI features (`docs/decisions.md` → Open).
 - Should prep end when only one device is online and its clock is off? (Clock skew is not corrected.)
+- Closing or reloading the tab within a fraction of a second after typing can lose those last keystrokes on
+  the device (IndexedDB writes still in flight); when online they are on the server already. Worth a look
+  if it shows up in real use (e.g. batch the device writes).
