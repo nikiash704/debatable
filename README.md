@@ -13,6 +13,17 @@ built for practice rounds and training.
 | **Asian Parliamentary (AP)** | Government vs Opposition | 3 + 3, plus reply speeches | 8 (6 substantive + 2 reply) |
 | **British Parliamentary (BP)** | OG, OO, CG, CO | 2 per team | 8 |
 
+## What works now
+
+- Rooms with permanent 5-character codes, no login, live sync between two devices, offline-first.
+- The flow board for APDA (format is config): cards, theses, points, numbering (OA / OC / OR, PM1…),
+  stages, "said" + speech mode, carry-over LO → MO, red "new — don't say" in the rebuttal, tags, hotkeys,
+  command palette.
+- Clash (stage 2): answer an argument with R, link with L; answers sit in the row of what they answer
+  with straight lines between them; unanswered arguments turn red, lane counters ("PM answered 4/5") and an
+  "N unanswered" list; focus on what a card answers; green "said in LOC" in the rebuttal; a Doc view
+  (outline) for prep with a shared prep timer; drag and drop by mouse, touch and keyboard.
+
 ## Planned features (draft)
 
 - Per-speech flow sheets laid out by format (columns per speech / bench)
@@ -52,6 +63,8 @@ Full reasoning in `docs/decisions.md` ("Tech stack").
 - **Cloudflare Worker** (static assets + API) with **one Durable Object per room** (SQLite storage).
 - **Yjs** CRDT for live collaboration (`Y.Text` per card, so two people can type in one card),
   synced through **`y-partyserver`**; **`y-indexeddb`** keeps a local copy for offline-first use.
+- Drag and drop: own pointer code (mouse, touch long press, Alt+↑/↓), no library; the drop preview
+  is the engine's own row layout.
 - **Vitest** for the flow engine, **Playwright** for end-to-end tests.
 
 ## Project layout
@@ -59,11 +72,11 @@ Full reasoning in `docs/decisions.md` ("Tech stack").
 | Path | What |
 |---|---|
 | `src/config/` | Format configs (APDA; a hidden demo format), participant names |
-| `src/engine/` | Pure TypeScript flow engine: numbering, stages, carry-over, commands (unit-tested) |
+| `src/engine/` | Pure TypeScript flow engine (unit-tested): stages, numbering, carry-over, commands; stage 2: rows (`rows.ts`), answer links / statuses / counters (`clash.ts`), prep timer (`timer.ts`), drag moves (`moves.ts`) |
 | `src/sync/` | Yjs document schema, room session (IndexedDB + live sync + presence), device storage |
-| `src/ui/` | React UI: board, top bar, stage bar, setup panel, palette; `components/` = design system pieces |
+| `src/ui/` | React UI: board (row grid), clash lines (`Arrows.tsx`), Doc view, prep timer, drag (`drag.ts`), top bar, stage bar, setup panel, palette; `components/` = design system pieces |
 | `worker/` | Cloudflare Worker + `Room` Durable Object (Yjs server, persistence, code reservation) |
-| `e2e/` | Playwright tests (spec 02 acceptance criteria, feature 01, touch) |
+| `e2e/` | Playwright tests: `flow.spec.ts` (feature 02 stage 1), `clash.spec.ts` (stage 2), `rooms.spec.ts` (feature 01), touch |
 | `docs/` | Specs, decisions, design notes, Figma reference cache, progress |
 
 ## Develop

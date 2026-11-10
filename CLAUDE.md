@@ -43,7 +43,7 @@ the user's decisions are binding, suggestions are not.
 | # | Feature | Status | File |
 |---|---|---|---|
 | 01 | Entry and saving (no login, room codes, live sync, server persistence) | decided for v1 | `docs/features/01-vhod-i-sohranenie.md` |
-| 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | **stage 1 approved for coding**; stages 2–3 planned | `docs/features/02-struktura-flou.md` |
+| 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | stage 1 built; **stage 2 (clash) built** — its defaults await the user's review (`docs/decisions.md`); stage 3 planned | `docs/features/02-struktura-flou.md` |
 
 These files are copies of the docs in the claude.ai Project "Debatable"
 (`claude/features/*.md`). When a spec changes in either place, update the other.
@@ -52,7 +52,13 @@ These files are copies of the docs in the claude.ai Project "Debatable"
 1. Stack + project skeleton + a deployed "hello world" on Cloudflare.
 2. Feature 01 (rooms, codes, real-time sync, server persistence).
 3. Feature 02, stage 1, on top of 01's sync. Done = all 10 acceptance criteria in the
-   spec pass on the "Ocean vs Space" scenario.
+   spec pass on the "Ocean vs Space" scenario. ✓ (10.11.2026)
+4. Feature 02, stage 2 ("clash": answer links + arrows, rows, focus, "answered" counters,
+   rebuttal highlights, Doc view + prep timer, drag and drop). Done = the 13 acceptance criteria
+   of the stage-2 brief (`e2e/clash.spec.ts`) plus all earlier tests. ✓ (10.11.2026)
+5. Feature 02, stage 3 (grouping the opponent's arguments, "dropped by Gov").
+
+Deployed: https://debatable.nikiash704.workers.dev (`npm run deploy`).
 
 ## Tech stack
 Not fixed by the user: **Claude Code chooses it.** Hard constraints:

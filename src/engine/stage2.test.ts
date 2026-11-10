@@ -396,17 +396,15 @@ describe("drag moves", () => {
   });
 
   it("locked columns keep their numbers when cards are reordered", () => {
-    const { s, a1, a2 } = prep();
+    const { s, a1, a3, a5 } = prep();
     s.go("PMC");
     s.go("LOC");
-    s.go("MG");
-    const d = cardDrag(APDA, s.state, s.rows(), a2);
-    // OA2 was carried to MO (unsaid) — move OA1 below nothing: take LO's own region instead
-    const d1 = cardDrag(APDA, s.state, s.rows(), a1)!;
-    const end = d1.slots[d1.slots.length - 1];
-    s.run({ ops: moveCardOps(s.state, a1, end) });
-    expect(s.label(a1)).toBe("OA1");
-    expect(d).not.toBeNull();
+    for (const id of [a1, a3, a5]) s.say(id); // they stay in LO; the others move to MO
+    s.go("MG"); // LO is locked now
+    const d = cardDrag(APDA, s.state, s.rows(), a1)!;
+    s.run({ ops: moveCardOps(s.state, a1, d.slots[d.slots.length - 1]) }); // OA1 to the end of thesis 3
+    expect(s.col("LOC").filter((l) => l.startsWith("OA"))).toEqual(["OA3", "OA5", "OA1"]);
+    expect([a1, a3, a5].map((id) => s.label(id))).toEqual(["OA1", "OA3", "OA5"]);
   });
 
   it("a linked answer moves only inside its row's stack", () => {
