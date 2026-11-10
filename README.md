@@ -7,6 +7,7 @@ built for tournament use.
 
 | Format | Teams | Speakers | Speeches |
 |---|---|---|---|
+| **American Parliamentary (APDA)** | Government vs Opposition | 2 + 2 | 6 (4 constructives + 2 rebuttals) |
 | **Asian Parliamentary (AP)** | Government vs Opposition | 3 + 3, plus reply speeches | 8 (6 substantive + 2 reply) |
 | **British Parliamentary (BP)** | OG, OO, CG, CO | 2 per team | 8 |
 
