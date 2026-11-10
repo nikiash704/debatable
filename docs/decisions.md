@@ -12,6 +12,10 @@ The app is for practice rounds and training, not for live tournament rounds.
    with visible hotkey hints (see `docs/features/02-struktura-flou.md`).
 5. **Format as config**: APDA first; BP and others are added as new config,
    without changing the engine.
+6. **Claude Code tooling**: the official Cloudflare plugin (`cloudflare@cloudflare`,
+   marketplace `cloudflare/skills`) is enabled for this repo in `.claude/settings.json`,
+   so every Claude Code session gets Cloudflare's Workers/Durable Objects/Wrangler skills
+   and the Cloudflare MCP server by default (decided 10.11.2026).
 
 ## Tech stack
 
