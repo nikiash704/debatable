@@ -65,9 +65,15 @@ Not fixed by the user: **Claude Code chooses it.** Hard constraints:
 Record the chosen stack and the reasons in `docs/decisions.md` before writing app code,
 and update the "Tech stack" section of `README.md`.
 
+## Design
+- Look and feel: `docs/design.md` (direction **D1 · Clean SaaS**, Figma file `AlPJWa4eWeuptbigOL3QS3`,
+  page "✓ D1 · Clean SaaS (chosen)"; pages D2–D5 are rejected explorations).
+- Cached Figma exports (screenshots, icons, extracted values) live in `docs/design-ref/`,
+  so the Figma API does not need to be called again; tokens are in `src/styles/tokens.css`.
+- Specs decide behaviour, the design decides the look.
+
 ## Workflow
 - Development branch: `claude/admiring-heisenberg-dhraiy`.
 - Commit after each working step with a clear message, so any step can be rolled back.
-- Designs live in Figma file `TJHHaf0ew3Yl9pHjVkJAxQ` (the board view is not drawn yet;
-  follow the written spec).
+- Designs: see "Design" above. Progress and next steps: `docs/progress.md`.
 - Keep `docs/decisions.md` current when a decision is made.

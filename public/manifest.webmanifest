@@ -1,0 +1,10 @@
+{
+  "name": "Debatable",
+  "short_name": "Debatable",
+  "description": "Flow parliamentary debate practice rounds with your partner.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F7F8",
+  "theme_color": "#F7F7F8",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

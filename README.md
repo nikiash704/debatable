@@ -26,7 +26,7 @@ built for practice rounds and training.
 | Tool | What it's for | Link |
 |---|---|---|
 | GitHub | Source code | https://github.com/nikiash704/debatable |
-| Figma | UI designs | https://www.figma.com/design/TJHHaf0ew3Yl9pHjVkJAxQ |
+| Figma | UI designs (chosen: D1 · Clean SaaS) | https://www.figma.com/design/AlPJWa4eWeuptbigOL3QS3 |
 | Google Drive | Motions, research, reference material | (connected to Claude) |
 
 ## Local setup (your laptop)
@@ -44,4 +44,20 @@ See `docs/features/` (indexed in `CLAUDE.md`).
 
 ## Tech stack
 
-Hosting: Cloudflare. The rest is chosen by Claude Code; see `docs/decisions.md`.
+Full reasoning in `docs/decisions.md` ("Tech stack").
+
+- **TypeScript** everywhere; **React 19 + Vite 8** single-page app, plain CSS with design tokens.
+- **Cloudflare Worker** (static assets + API) with **one Durable Object per room** (SQLite storage).
+- **Yjs** CRDT for live collaboration (`Y.Text` per card, so two people can type in one card),
+  synced through **`y-partyserver`**; **`y-indexeddb`** keeps a local copy for offline-first use.
+- **Vitest** for the flow engine, **Playwright** for end-to-end tests.
+
+## Develop
+
+```bash
+npm install
+npm run dev        # app + Worker + Durable Objects locally (workerd) on http://localhost:5173
+npm test           # engine unit tests
+npm run e2e        # Playwright end-to-end tests (builds first)
+npm run deploy     # build and deploy to Cloudflare (needs `wrangler login` or CLOUDFLARE_API_TOKEN)
+```

@@ -11,3 +11,8 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 coverage/
+.wrangler/
+.tmp/
+test-results/
+playwright-report/
+.dev.vars
