@@ -99,6 +99,14 @@ async function mirrorMatches(editor: Locator): Promise<boolean> {
   return bad === 0;
 }
 
+/** A screenshot of the field with some of the page around it (the ghost may overflow below). */
+async function shotAround(editor: Locator, name: string) {
+  const b = (await editor.boundingBox())!;
+  const x = Math.max(0, b.x - 60);
+  const y = Math.max(0, b.y - 50);
+  await editor.page().screenshot({ path: `${SHOTS}/ghost-${name}.png`, clip: { x, y, width: b.width + 120, height: b.height + 130 } });
+}
+
 /** Types, waits for the ghost, and checks it lines up without moving anything. */
 async function expectGhost(page: Page, editor: Locator, text: string, rest: string, shot: string) {
   await page.keyboard.type(text);
@@ -107,7 +115,7 @@ async function expectGhost(page: Page, editor: Locator, text: string, rest: stri
   expect(await layout(page, editor)).toEqual(before);
   expect(await mirrorMatches(editor)).toBe(true);
   // the gray text starts right after the last typed character
-  if (SHOTS) await editor.locator("xpath=../..").screenshot({ path: `${SHOTS}/ghost-${shot}.png` });
+  if (SHOTS) await shotAround(editor, shot);
 }
 
 test("ghost text in a thesis, card and point; → accepts; one undo removes it", async ({ page }) => {
@@ -160,7 +168,7 @@ test("ghost text in a thesis, card and point; → accepts; one undo removes it",
   await page.keyboard.type("e,");
   await expect(ghost(page)).toHaveText(LONG);
   expect(await mirrorMatches(point)).toBe(true);
-  if (SHOTS) await point.locator("xpath=../../../..").screenshot({ path: `${SHOTS}/ghost-point-wrap.png` });
+  if (SHOTS) await shotAround(point, "point-wrap");
 
   // Esc still stops editing and the ghost goes with it
   await page.keyboard.press("Escape");

@@ -150,67 +150,67 @@ export function YTextEditor({
   // textarea; it only becomes a positioning context while a ghost is shown.
   return (
     <div className={view ? "ed-wrap ed-wrap--ghost" : "ed-wrap"}>
-    <textarea
-      ref={ref}
-      className={`ed${className ? ` ${className}` : ""}`}
-      rows={rows}
-      placeholder={placeholder}
-      spellCheck
-      data-testid={testId}
-      aria-label={ariaLabel}
-      onInput={() => {
-        pushDiff();
-        ghost.onInput();
-      }}
-      onCompositionStart={() => {
-        composing.current = true;
-        ghost.clear();
-      }}
-      onCompositionEnd={() => {
-        composing.current = false;
-        pushDiff();
-        ghost.onInput();
-      }}
-      onKeyDown={(e) => {
-        const mod = e.metaKey || e.ctrlKey;
-        if (mod && !e.altKey && e.key.toLowerCase() === "z") {
-          e.preventDefault();
-          if (e.shiftKey) onRedo?.();
-          else onUndo?.();
-          return;
-        }
-        if (mod && !e.altKey && e.key.toLowerCase() === "y") {
-          e.preventDefault();
-          onRedo?.();
-          return;
-        }
-        if (ghost.onKeyDown(e)) return;
-        onKeyDown?.(e);
-      }}
-      onBlur={() => {
-        ghost.clear();
-        onBlur?.();
-      }}
-      onFocus={onFocus}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-    />
-    {view && (
-      <div className="ed-ghost" aria-hidden="true">
-        <span className="ed-ghost__text">{view.text}</span>
-        <span
-          className="ed-ghost__rest"
-          data-testid="ghost"
-          onPointerDown={ghost.onGhostPointerDown}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          {view.ghost}
-        </span>
-      </div>
-    )}
+      <textarea
+        ref={ref}
+        className={`ed${className ? ` ${className}` : ""}`}
+        rows={rows}
+        placeholder={placeholder}
+        spellCheck
+        data-testid={testId}
+        aria-label={ariaLabel}
+        onInput={() => {
+          pushDiff();
+          ghost.onInput();
+        }}
+        onCompositionStart={() => {
+          composing.current = true;
+          ghost.clear();
+        }}
+        onCompositionEnd={() => {
+          composing.current = false;
+          pushDiff();
+          ghost.onInput();
+        }}
+        onKeyDown={(e) => {
+          const mod = e.metaKey || e.ctrlKey;
+          if (mod && !e.altKey && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            if (e.shiftKey) onRedo?.();
+            else onUndo?.();
+            return;
+          }
+          if (mod && !e.altKey && e.key.toLowerCase() === "y") {
+            e.preventDefault();
+            onRedo?.();
+            return;
+          }
+          if (ghost.onKeyDown(e)) return;
+          onKeyDown?.(e);
+        }}
+        onBlur={() => {
+          ghost.clear();
+          onBlur?.();
+        }}
+        onFocus={onFocus}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      />
+      {view && (
+        <div className="ed-ghost" aria-hidden="true">
+          <span className="ed-ghost__text">{view.text}</span>
+          <span
+            className="ed-ghost__rest"
+            data-testid="ghost"
+            onPointerDown={ghost.onGhostPointerDown}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            {view.ghost}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
