@@ -289,7 +289,6 @@ export interface UpstreamBody {
   messages: ChatMessage[];
   max_tokens: number;
   temperature: number;
-  stop: string[];
   reasoning: { enabled: false };
 }
 
@@ -374,7 +373,6 @@ export function createSuggestHandler() {
       messages,
       max_tokens: SUGGEST_CONFIG.maxTokens,
       temperature: SUGGEST_CONFIG.temperature,
-      stop: ["\n"],
       reasoning: { enabled: false },
     };
     const key = await sha256Hex(JSON.stringify(body));

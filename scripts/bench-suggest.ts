@@ -168,6 +168,7 @@ interface Row {
   id: string;
   tags: string[];
   field: string;
+  context: SuggestRequest["context"];
   model: string;
   servedModel: string | null;
   before: string;
@@ -311,6 +312,7 @@ async function live(a: Args, items: BenchItem[], models: string[]) {
         id: job.item.id,
         tags: job.item.tags,
         field: job.item.field,
+        context: job.item.context,
         model: job.model,
         servedModel: s.servedModel,
         before: job.item.before,

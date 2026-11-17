@@ -154,7 +154,7 @@ describe("POST /api/suggest", () => {
     expect(sent.models).toEqual([...SUGGEST_CONFIG.models]);
     expect(sent.max_tokens).toBe(SUGGEST_CONFIG.maxTokens);
     expect(sent.temperature).toBe(SUGGEST_CONFIG.temperature);
-    expect(sent.stop).toEqual(["\n"]);
+    expect("stop" in sent).toBe(false); // most free models ignore it; postProcess keeps the first line
     expect(sent.reasoning).toEqual({ enabled: false });
     expect(sent.messages.at(-1)?.content).toContain(valid().before);
     expect(init.signal).toBeInstanceOf(AbortSignal);

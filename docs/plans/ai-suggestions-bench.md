@@ -49,7 +49,7 @@ All shortlisted models list `reasoning` and `include_reasoning`; none is reasoni
 sends OpenRouter's unified **`reasoning: { enabled: false }`** (equivalent: `reasoning: { effort: "none" }`;
 Ernie also lists `reasoning_effort`). Do **not** rely on `include_reasoning: false` or
 `reasoning: { exclude: true }`: they only hide the thinking, the model still spends the time.
-The catalog does not say which models think by default (Gemma 4: thinking is opt-in;
+The catalog does not say which models think by default (Gemma 4: "configurable thinking mode";
 Ling 3.2 Flash: "hybrid reasoning"; the Nemotron 3.5 models: hybrid). The bench shows it indirectly:
 a model that still thinks has a high p50, more timeouts (the Worker cuts at 4 s) and more empty
 answers (thinking eats `max_tokens: 40`). `postProcess` also strips `<think>…</think>` text and returns
@@ -163,13 +163,14 @@ same script as the note (Cyrillic vs not). Format pass = non-empty and no failur
 ids rotated so none exceeds ~5/min (limit 6). Jobs run item by item with all models interleaved, so a
 run cut short by `--budget` still compares models on the same items. Default budget: 300 requests.
 
-**Quality:** not automatic. `answers.jsonl` has `before`, `text`, `joined` (what the user would see
+**Quality:** not automatic. `answers.jsonl` has `context`, `before`, `text`, `joined` (what the user would see
 after accepting) and `reference` per answer. Score each with a judge, 1–5, and have a person read
 ~20 random answers per finalist. Judge prompt:
 
 ```
-You grade autocomplete suggestions for a debater's flow notes. For each item you get the motion-free
-note text before the caret, the suggestion, and (sometimes) what the debater really wrote.
+You grade autocomplete suggestions for a debater's flow notes. For each item you get the context
+(motion, side, speech, thesis, the opponent note it answers), the note text before the caret,
+the suggestion, and (sometimes) what the debater really wrote.
 Score 1–5: 5 = exactly what a good debater would write next (terse, on point, right side of the
 argument); 3 = plausible but generic or slightly off; 1 = wrong, off-topic, wrong language, or broken
 spacing. Judge the joined text. The reference is one good answer, not the only one.
@@ -192,12 +193,12 @@ Runs on Node 26 as is; `npx tsx scripts/bench-suggest.ts …` also works (tsx is
 node scripts/bench-suggest.ts --dry --n 10
 
 # 1. Screening: 20 items spread over the corpus × 7 models = 140 requests (~10 min)
-node scripts/bench-suggest.ts --base https://debatable.nikiash704.workers.dev --n 20 --out bench/screen
+node scripts/bench-suggest.ts --base https://debatable.nikiash704.workers.dev --n 20
 
 # 2. Finalists: the whole corpus × the best 3 = 174 requests (~13 min)
 node scripts/bench-suggest.ts --base https://debatable.nikiash704.workers.dev \
   --models google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3.5-lightning:free,google/gemma-4-31b-it:free \
-  --budget 180 --out bench/final
+  --budget 180
 ```
 
 Options: `--room CODE` (an existing room; otherwise the script claims a fresh code, which counts as
