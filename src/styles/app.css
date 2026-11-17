@@ -2364,7 +2364,7 @@ body.dragging .card__tools {
 /* ---------- AI ghost text (docs/plans/ai-suggestions.md) ----------
    A mirror over the textarea with the same text metrics: the field's text in transparent ink, then
    the suggested rest of the sentence in the placeholder colour, so it starts at the caret and wraps
-   like real text. Absolutely positioned, so the textarea's autosize never measures it. */
+   like real text. Absolutely positioned; the editor sizes the textarea to fit text + ghost. */
 .ed-wrap--ghost {
   position: relative;
 }

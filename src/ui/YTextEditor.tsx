@@ -30,8 +30,9 @@ export interface YTextEditorProps {
  * card at once and both texts survive.
  *
  * With `suggest`, a typing pause at the end of a sentence shows an AI continuation as gray "ghost"
- * text after the caret (plan: docs/plans/ai-suggestions.md). The ghost is drawn by a mirror layer
- * over the textarea that is absolutely positioned, so the textarea's size (autosize) never sees it;
+ * text after the caret (plan: docs/plans/ai-suggestions.md). The ghost is drawn by an absolutely
+ * positioned mirror layer over the textarea; while it shows, autosize fits text + ghost (the field
+ * grows as if the ghost had been typed) and goes back to the text's own height when it is dismissed.
  * → at the end, or a tap on the gray text, accepts it through the normal typing path.
  */
 export function YTextEditor({
@@ -54,11 +55,15 @@ export function YTextEditor({
   const composing = useRef(false);
   const rel = useRef<{ start: Y.RelativePosition; end: Y.RelativePosition } | null>(null);
 
+  const mirror = useRef<HTMLDivElement>(null);
+
+  /** Height = the text's height; while a ghost shows, text + ghost, as if it had been typed. */
   const autosize = () => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${el.scrollHeight}px`;
+    const ghostH = mirror.current ? Math.ceil(mirror.current.getBoundingClientRect().height) : 0;
+    el.style.height = `${Math.max(el.scrollHeight, ghostH)}px`;
   };
 
   const rememberSelection = () => {
@@ -145,6 +150,8 @@ export function YTextEditor({
 
   const ghost = useGhost({ ref, composing, suggest, commit: pushDiff });
   const view = ghost.view;
+  // the field grows to fit a wrapping ghost and returns to its own height when the ghost goes
+  useLayoutEffect(autosize, [view]);
 
   // The wrapper is a plain block (no box of its own), so the page lays out exactly as with a bare
   // textarea; it only becomes a positioning context while a ghost is shown.
@@ -197,7 +204,7 @@ export function YTextEditor({
         onDoubleClick={(e) => e.stopPropagation()}
       />
       {view && (
-        <div className="ed-ghost" aria-hidden="true">
+        <div className="ed-ghost" aria-hidden="true" ref={mirror}>
           <span className="ed-ghost__text">{view.text}</span>
           <span
             className="ed-ghost__rest"

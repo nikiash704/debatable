@@ -99,7 +99,7 @@ async function mirrorMatches(editor: Locator): Promise<boolean> {
   return bad === 0;
 }
 
-/** A screenshot of the field with some of the page around it (the ghost may overflow below). */
+/** A screenshot of the field with some of the page around it. */
 async function shotAround(editor: Locator, name: string) {
   const b = (await editor.boundingBox())!;
   const x = Math.max(0, b.x - 60);
@@ -107,15 +107,31 @@ async function shotAround(editor: Locator, name: string) {
   await editor.page().screenshot({ path: `${SHOTS}/ghost-${name}.png`, clip: { x, y, width: b.width + 120, height: b.height + 130 } });
 }
 
-/** Types, waits for the ghost, and checks it lines up without moving anything. */
+/** Field height and the height of its text + ghost (the mirror). */
+async function heights(editor: Locator) {
+  return editor.evaluate((el) => ({
+    field: el.getBoundingClientRect().height,
+    mirror: Math.ceil(el.parentElement!.querySelector(".ed-ghost")?.getBoundingClientRect().height ?? 0),
+  }));
+}
+
+/**
+ * Types, waits for the ghost, and checks it lines up. The field fits text + ghost, as if the ghost
+ * had been typed; if the ghost fits on the field's lines, nothing on the page moves at all.
+ * Returns the page layout from before the ghost appeared.
+ */
 async function expectGhost(page: Page, editor: Locator, text: string, rest: string, shot: string) {
   await page.keyboard.type(text);
   const before = await layout(page, editor);
+  const h0 = (await heights(editor)).field;
   await expect(ghost(page)).toHaveText(rest);
-  expect(await layout(page, editor)).toEqual(before);
+  const h = await heights(editor);
+  expect(h.field).toBe(Math.max(h0, h.mirror));
+  if (h.field === h0) expect(await layout(page, editor)).toEqual(before);
   expect(await mirrorMatches(editor)).toBe(true);
   // the gray text starts right after the last typed character
   if (SHOTS) await shotAround(editor, shot);
+  return { before, h0 };
 }
 
 test("ghost text in a thesis, card and point; → accepts; one undo removes it", async ({ page }) => {
@@ -140,10 +156,25 @@ test("ghost text in a thesis, card and point; → accepts; one undo removes it",
   await page.keyboard.press("Enter");
   const cardEd = page.getByTestId("card-editor");
   await expect(cardEd).toBeFocused();
-  await expectGhost(page, cardEd, "Asteroid mining unlocks scarce", " metals that Earth is running out of.", "card");
+  const cardBox = page.locator('[data-testid="card"]').filter({ has: cardEd });
+  const { before: cardLayout, h0: cardFieldH0 } = await expectGhost(page, cardEd, "Asteroid mining unlocks scarce", " metals that Earth is running out of.", "card");
+  // this ghost wraps: the field and the card grow while it shows…
+  expect((await heights(cardEd)).field).toBeGreaterThan(cardFieldH0);
+  const cardGrown = (await cardBox.boundingBox())!.height;
+  // …and everything goes back to exactly where it was when it is dismissed
+  await page.keyboard.press("ArrowLeft");
+  await expect(ghost(page)).toHaveCount(0);
+  expect(await layout(page, cardEd)).toEqual(cardLayout);
+  expect((await cardBox.boundingBox())!.height).toBeLessThan(cardGrown);
+  await page.keyboard.press("End");
+  // the same text again is answered from the cache: no new request
+  const n = mock.requests.length;
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("e");
+  await expect(ghost(page)).toHaveText(" metals that Earth is running out of.");
+  expect(mock.requests.length).toBe(n);
 
   // type-through: matching letters keep the rest, no new request
-  const n = mock.requests.length;
   await page.keyboard.type(" met");
   await expect(ghost(page)).toHaveText("als that Earth is running out of.");
   // a different letter drops it
@@ -157,16 +188,40 @@ test("ghost text in a thesis, card and point; → accepts; one undo removes it",
   await expect(ghost(page)).toHaveCount(0);
   await page.keyboard.press("End");
 
+  // accepted, the field is exactly as tall as the same text typed by hand
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("x"); // same text → cached ghost
+  await expect(ghost(page)).toHaveText(LONG);
+  const withGhost = await heights(cardEd);
+  await page.keyboard.press("ArrowRight");
+  await expect(ghost(page)).toHaveCount(0);
+  const accepted = { field: (await heights(cardEd)).field, card: (await cardBox.boundingBox())!.height, layout: await layout(page, cardEd) };
+  expect(accepted.field).toBe(withGhost.field);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect(cardEd).toHaveValue("Asteroid mining unlocks scarce metx");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(LONG);
+  await page.waitForTimeout(900);
+  await expect(ghost(page)).toHaveCount(0);
+  expect((await heights(cardEd)).field).toBe(accepted.field);
+  expect((await cardBox.boundingBox())!.height).toBe(accepted.card);
+  expect(await layout(page, cardEd)).toEqual(accepted.layout);
+
   // Tab still indents (the ghost is dropped, never accepted)
   await page.keyboard.press("Enter");
   await page.keyboard.press("Tab");
   const point = page.getByTestId("point-editor");
   await expect(point).toBeFocused();
   await expectGhost(page, point, "Platinum group metals are", " rare on Earth.", "point");
-  // the long one wraps like text and still moves nothing
+  // the long one wraps over several lines; the point grows to fit it
   await page.keyboard.press("Backspace");
   await page.keyboard.type("e,");
+  const pointH0 = (await heights(point)).field;
   await expect(ghost(page)).toHaveText(LONG);
+  const ph = await heights(point);
+  expect(ph.field).toBe(ph.mirror);
+  expect(ph.field).toBeGreaterThan(pointH0);
   expect(await mirrorMatches(point)).toBe(true);
   if (SHOTS) await shotAround(point, "point-wrap");
 
