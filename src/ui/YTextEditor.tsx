@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import * as Y from "yjs";
 import { LOCAL } from "../sync/doc";
+import type { SuggestInput } from "../shared/suggest";
 
 export interface YTextEditorProps {
   ytext: Y.Text;
@@ -18,6 +19,8 @@ export interface YTextEditorProps {
   testId?: string;
   ariaLabel?: string;
   rows?: number;
+  /** AI ghost-text suggestions: returns what this field sends to /api/suggest (null = no suggestions). */
+  suggest?: () => SuggestInput | null;
 }
 
 /**

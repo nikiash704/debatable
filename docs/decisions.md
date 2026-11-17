@@ -251,9 +251,25 @@ Claude made where the brief left room. All of it can change.
     header (thesis order is per side, so every lane follows). Alt+↑/↓ = one slot, also while typing and in the
     Doc view (mouse / touch drag is on the board only).
 
+## AI sentence suggestions (decided 17.11.2026, user: "use your defaults")
+
+Plan: `docs/plans/ai-suggestions.md`. The user asked for gray ghost text that suggests how to finish every
+sentence in every round text field, using free OpenRouter models, key `API_KEY_OPENROUTER` in Cloudflare,
+and **no other change to the app or its interface**. Defaults taken from the plan (section 3):
+1. Budget: built for OpenRouter's free tier with $10+ credits bought (20 requests/min, 1000/day; 50/day
+   without). The Worker stops calling upstream at 95 % of the daily cap and returns no suggestion.
+2. Privacy: round text is sent to free model providers (some may log it). Accepted for a practice tool.
+3. Accept: → at the end of the text; on touch, a tap on the gray text. Tab stays indent; Esc, Enter and
+   every other key keep their meaning and ignore the suggestion.
+4. Fields: every `YTextEditor` in a round: cards, points, thesis titles, Doc view lines, the motion.
+5. On for everyone, no on/off switch (a switch would be interface). Shown in speech mode too.
+6. Key: read as a Worker secret, `env.API_KEY_OPENROUTER`. (If it turns out to be in the account
+   Secrets Store, a `secrets_store_secrets` binding is needed instead.)
+7. The client sends structured context (`src/shared/suggest.ts`), the Worker builds the prompt.
+
 ## Open
 
 1. **Stylus / handwriting input**: not in stage 1; decide later.
-2. **AI features**: which "smart" assists are in v1.
+2. **AI features**: beyond sentence suggestions (above), which "smart" assists are in v1.
 3. **Participant name list** (feature 01): use a temporary placeholder list in a
    separate config file until the user picks the final one.

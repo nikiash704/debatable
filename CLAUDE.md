@@ -44,6 +44,7 @@ the user's decisions are binding, suggestions are not.
 |---|---|---|---|
 | 01 | Entry and saving (no login, room codes, live sync, server persistence) | decided for v1 | `docs/features/01-vhod-i-sohranenie.md` |
 | 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | stage 1 built; **stage 2 (clash) built** — its defaults await the user's review (`docs/decisions.md`); stage 3 planned | `docs/features/02-struktura-flou.md` |
+| 03 | AI sentence suggestions (gray ghost text in every round text field, free OpenRouter models) | in progress; no spec file, the user's request and defaults are in `docs/decisions.md` | `docs/plans/ai-suggestions.md` |
 
 These files are copies of the docs in the claude.ai Project "Debatable"
 (`claude/features/*.md`). When a spec changes in either place, update the other.
