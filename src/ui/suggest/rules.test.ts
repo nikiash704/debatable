@@ -34,6 +34,20 @@ describe("currentSentence", () => {
   it("does not split inside numbers", () => {
     expect(currentSentence("Costs 3.5 billion a year")).toBe("Costs 3.5 billion a year");
   });
+  it("does not end a sentence at an abbreviation (e.g. vs. i.e. Dr. U.S.)", () => {
+    expect(currentSentence("Ocean vs. space funding")).toBe("Ocean vs. space funding");
+    expect(currentSentence("Spin-offs, e.g. GPS and")).toBe("Spin-offs, e.g. GPS and");
+    expect(currentSentence("Cheaper (i.e. per discovery")).toBe("Cheaper (i.e. per discovery");
+    expect(currentSentence("Ask Dr. Smith about")).toBe("Ask Dr. Smith about");
+    expect(currentSentence("The U.S. Navy maps")).toBe("The U.S. Navy maps");
+    expect(currentSentence("VS. space")).toBe("VS. space");
+    // a real sentence end before the abbreviation still counts
+    expect(currentSentence("Oceans matter. Space vs. sea is")).toBe(" Space vs. sea is");
+    // words that merely end in the same letters are not abbreviations
+    expect(currentSentence("We want results. Then")).toBe(" Then");
+    expect(currentSentence("Nobody does. Then")).toBe(" Then");
+    expect(currentSentence("Costs go up etc. Then")).toBe(" Then");
+  });
 });
 
 describe("shouldSuggest", () => {
@@ -61,6 +75,18 @@ describe("endsSentence / countWords", () => {
     expect(endsSentence('He said "no."')).toBe(true);
     expect(endsSentence("(see above.)")).toBe(true);
     expect(endsSentence("e.g")).toBe(false);
+  });
+  it("is not fooled by abbreviations", () => {
+    expect(endsSentence("Ocean vs.")).toBe(false);
+    expect(endsSentence("Spin-offs, e.g. ")).toBe(false);
+    expect(endsSentence("Data from the U.S.")).toBe(false);
+    expect(endsSentence("We want results.")).toBe(true);
+    expect(endsSentence("Mining is costly etc.")).toBe(true);
+  });
+  it("lets shouldSuggest ask after an abbreviation", () => {
+    expect(shouldSuggest("Ocean vs. space", 3)).toBe(true);
+    expect(shouldSuggest("Spin-offs, e.g. GPS", 3)).toBe(true);
+    expect(shouldSuggest("Spin-offs pay, e.g. ", 3)).toBe(true);
   });
   it("counts words across any whitespace", () => {
     expect(countWords("  a  b\tc ")).toBe(3);

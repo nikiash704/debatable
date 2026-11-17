@@ -330,8 +330,17 @@ describe("QuotaCounter", () => {
     let saved: QuotaSnapshot | null = null;
     return { load: () => saved, save: (s: QuotaSnapshot) => void (saved = { ...s }), get: () => saved };
   };
-  const limits = { daily: 5, perMinute: 3, perDevice: 2, perIp: 3 };
+  const limits = { daily: 5, perMinute: 3, perDevice: 2, perIp: 3, perIpDaily: 1000 };
   const t0 = Date.UTC(2026, 10, 17, 23, 50);
+
+  it("per-IP daily cap: one client cannot use up the shared budget; resets at the UTC day", () => {
+    const q = new QuotaCounter(memoryStore(), { daily: 100, perMinute: 100, perDevice: 100, perIp: 100, perIpDaily: 2 });
+    expect(q.take(t0, "a", "1.1.1.1")).toBe("ok");
+    expect(q.take(t0 + 1, "b", "1.1.1.1")).toBe("ok");
+    expect(q.take(t0 + 2, "c", "1.1.1.1")).toBe("ip-daily");
+    expect(q.take(t0 + 3, "d", "2.2.2.2")).toBe("ok");
+    expect(q.take(t0 + 15 * 60_000, "e", "1.1.1.1")).toBe("ok"); // next UTC day
+  });
 
   it("uses the configured caps: 95 % of the daily cap, 20 per minute", () => {
     expect(quotaLimits().daily).toBe(Math.floor(SUGGEST_CONFIG.dailyCap * SUGGEST_CONFIG.dailyCapShare));

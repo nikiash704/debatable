@@ -8,11 +8,22 @@ import { SUGGEST_LIMITS, type SuggestRequest } from "../../shared/suggest";
 /** The longest continuation the editor will show (the Worker caps it too). */
 export const MAX_GHOST = 300;
 
+/**
+ * A word that ends in "." without ending the sentence: e.g. i.e. vs. cf. Mr. Dr. … and dotted
+ * initials (U.S., U.K.). `head` is the text up to (not including) that dot.
+ * "etc." and "no." are left out on purpose: they often do end a sentence.
+ */
+const ABBREVIATION = /(?:^|[\s(["'“‘«])(?:e\.g|i\.e|vs|cf|approx|incl|esp|mr|mrs|ms|dr|prof|fig|\p{L}(?:\.\p{L})+)$/iu;
+const isAbbreviation = (head: string) => ABBREVIATION.test(head);
+
 /** Text of the sentence being typed: after the last newline or sentence end (. ! ? … then a space). */
 export function currentSentence(text: string): string {
   let start = 0;
   const re = /\n|[.!?…]+(?=\s)/g;
-  for (let m = re.exec(text); m; m = re.exec(text)) start = m.index + m[0].length;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m[0] === "." && isAbbreviation(text.slice(0, m.index))) continue; // "vs. ", "e.g. "
+    start = m.index + m[0].length;
+  }
   return text.slice(start);
 }
 
@@ -20,9 +31,11 @@ export function countWords(s: string): number {
   return s.split(/\s+/).filter(Boolean).length;
 }
 
-/** True when the text has just finished a sentence (ends in . ! ? …, maybe followed by quotes or spaces). */
+/** True when the text has just finished a sentence (ends in . ! ? …, maybe followed by quotes or spaces; not after "vs.", "e.g." …). */
 export function endsSentence(text: string): boolean {
-  return /[.!?…]["'”’)\]]*\s*$/.test(text);
+  const m = /([.!?…]+)["'”’)\]]*\s*$/.exec(text);
+  if (!m) return false;
+  return !(m[1] === "." && isAbbreviation(text.slice(0, m.index)));
 }
 
 /** Whether a typing pause at the end of `text` should ask for a continuation. */

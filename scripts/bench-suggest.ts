@@ -239,6 +239,7 @@ function infraSkip(skip: string | null, status: number): { wait: number } | { st
   if (status === 403) return { stop: "forbidden (403)" };
   if (!skip) return null;
   if (skip === "quota-daily") return { stop: "shared daily quota reached (quota-daily)" };
+  if (skip === "quota-ip-daily") return { stop: "this IP's daily quota reached (quota-ip-daily)" };
   if (skip === "no-key" || skip === "no-model") return { stop: `Worker not configured (${skip})` };
   if (skip === "quota-minute" || skip === "quota-device" || skip === "quota-ip") return { wait: 61_000 };
   if (skip === "quota-backoff") return { wait: 20_000 };

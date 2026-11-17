@@ -44,8 +44,12 @@ thesis titles, Doc view lines, motion). → at the end of the text or a tap on t
 - To ship: `npm run deploy` (needs the `API_KEY_OPENROUTER` Worker secret; without it the endpoint stays
   silent), run the benchmark, put the winners in `src/config/suggest.ts`, deploy again.
 - Local dev with real suggestions: `API_KEY_OPENROUTER=…` in `.dev.vars` (git-ignored). Tests always mock.
+- Tests: 169 unit, 27 e2e (+1 skipped); with no ghost showing, screens are pixel-identical to the build
+  before the feature (QA compared 11 screens).
 - Known small issues: accepting within 0.6 s of typed-through letters undoes together with them; the ghost is
-  not struck through on struck cards.
+  not struck through on struck cards; an unclaimed room or a network error logs "Failed to load resource" in
+  the browser console on typing pauses; very long non-Latin context can exceed the 8 KB body cap (then no
+  suggestion).
 
 ## Tests (all passing)
 

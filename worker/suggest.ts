@@ -20,6 +20,8 @@ export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const DEVICE_PER_MINUTE = 6;
 /** Soft per-IP limit (catches a script that rotates device ids). Two partners behind one NAT fit. */
 export const IP_PER_MINUTE = 15;
+/** One IP may use at most this many upstream calls per UTC day (well under the shared daily budget; the model benchmark needs ~320). */
+export const IP_PER_DAY = 400;
 /** How long a positive "room exists" answer is trusted in this isolate. */
 const ROOM_CACHE_MS = 10 * 60_000;
 const ROOM_CACHE_ITEMS = 1000;
@@ -119,7 +121,7 @@ export async function readCappedText(request: Request, cap: number): Promise<str
 // ---------------------------------------------------------------------------------------------
 // Quota: one global counter (lives in the SuggestQuota Durable Object, worker/suggest-quota.ts)
 
-export type QuotaVerdict = "ok" | "backoff" | "daily" | "minute" | "device" | "ip";
+export type QuotaVerdict = "ok" | "backoff" | "daily" | "minute" | "device" | "ip" | "ip-daily";
 
 export interface QuotaLimits {
   /** Upstream calls per UTC day. */
@@ -128,6 +130,8 @@ export interface QuotaLimits {
   perMinute: number;
   perDevice: number;
   perIp: number;
+  /** Upstream calls per IP per UTC day, so one client cannot use up everyone's daily budget. */
+  perIpDaily: number;
 }
 
 /** What survives a Durable Object restart. Minute windows are kept in memory only. */
@@ -150,6 +154,7 @@ export function quotaLimits(): QuotaLimits {
     perMinute: SUGGEST_CONFIG.perMinuteCap,
     perDevice: DEVICE_PER_MINUTE,
     perIp: IP_PER_MINUTE,
+    perIpDaily: IP_PER_DAY,
   };
 }
 
@@ -166,6 +171,9 @@ export class QuotaCounter {
   #state: QuotaSnapshot;
   #recent: number[] = [];
   #perKey = new Map<string, number[]>();
+  /** ip → calls today (memory only, like the minute windows; IPs are never stored). */
+  #ipDay = new Map<string, number>();
+  #ipDayKey = "";
 
   constructor(store: QuotaStore, limits: QuotaLimits) {
     this.#store = store;
@@ -190,10 +198,17 @@ export class QuotaCounter {
     const iKey = ip ? `i:${ip}` : "";
     const iTimes = iKey ? (this.#perKey.get(iKey) ?? []).filter((t) => t > since) : [];
     if (iKey && iTimes.length >= this.#limits.perIp) return "ip";
+    if (this.#ipDayKey !== day) {
+      this.#ipDay.clear();
+      this.#ipDayKey = day;
+    }
+    const ipToday = ip ? (this.#ipDay.get(ip) ?? 0) : 0;
+    if (ip && ipToday >= this.#limits.perIpDaily) return "ip-daily";
 
     this.#recent.push(now);
     this.#perKey.set(dKey, [...dTimes, now]);
     if (iKey) this.#perKey.set(iKey, [...iTimes, now]);
+    if (ip) this.#ipDay.set(ip, ipToday + 1);
     this.#state = { ...this.#state, day, count: count + 1 };
     this.#store.save(this.#state);
     return "ok";

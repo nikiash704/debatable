@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { MOD, openNewRoom, showView } from "./helpers";
+import { card, laneLabels, MOD, newDevice, openNewRoom, openRoom, showView, waitSynced } from "./helpers";
 
 /**
  * AI ghost text (docs/plans/ai-suggestions.md, Phase 1c). The endpoint is always mocked here:
@@ -276,4 +276,208 @@ test("no request for short or finished sentences; errors and slow answers stay s
   await page.waitForTimeout(3000);
   await expect(ghost(page)).toHaveText(LONG); // only the answer for the latest text shows
   await expect(page.getByTestId("thesis-editor")).toHaveValue("Two words and done again now");
+});
+
+// ---------------------------------------------------------------------------------------------
+// QA (Phase 3): partner, offline, existing keys while a ghost shows, touch
+
+/** Console errors and uncaught page errors, collected from the start. */
+function consoleErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(String(e)));
+  return errors;
+}
+
+test("a ghost stays on its device: the partner sees only accepted text, and a partner's edit drops it", async ({ page, browser }) => {
+  const mockA = await mockSuggest(page);
+  const code = await openNewRoom(page);
+  const b = await newDevice(browser);
+  const mockB = await mockSuggest(b.page);
+  await openRoom(b.page, code);
+  await waitSynced(page);
+  await waitSynced(b.page);
+
+  await page.getByTestId("add-thesis-LOC").click();
+  await page.keyboard.type("Space is the bigger");
+  await expect(ghost(page)).toHaveText(" long-term payoff for humanity.");
+  // B gets the typed text only: no gray text, no suggestion words anywhere, no request of its own
+  await expect(b.page.getByTestId("thesis-title")).toHaveText("Space is the bigger");
+  await expect(ghost(b.page)).toHaveCount(0);
+  await expect(b.page.getByText("long-term payoff")).toHaveCount(0);
+  expect(mockB.requests).toHaveLength(0);
+
+  // accepted text syncs like typing
+  await page.keyboard.press("ArrowRight");
+  await expect(b.page.getByTestId("thesis-title")).toHaveText("Space is the bigger long-term payoff for humanity.");
+
+  // A shows a ghost in a card; B types in the same card: A's ghost goes, B's text arrives
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Asteroid mining unlocks scarce");
+  await expect(ghost(page)).toHaveText(" metals that Earth is running out of.");
+  await expect(card(b.page, "OA1")).toContainText("Asteroid mining unlocks scarce");
+  await expect(b.page.getByText("running out of")).toHaveCount(0);
+  await card(b.page, "OA1").dblclick();
+  await expect(b.page.getByTestId("card-editor")).toBeFocused();
+  await b.page.keyboard.press("End");
+  await b.page.keyboard.type(" rare");
+  await expect(page.getByTestId("card-editor")).toHaveValue("Asteroid mining unlocks scarce rare");
+  await expect(ghost(page)).toHaveCount(0);
+  // B now has a ghost of its own after its pause; A never sees it
+  await expect(ghost(b.page)).toHaveText(LONG);
+  expect(mockB.requests.at(-1)).toMatchObject({ before: "Asteroid mining unlocks scarce rare", field: "card" });
+  await page.waitForTimeout(300);
+  await expect(ghost(page)).toHaveCount(0);
+  await expect(page.getByText("much longer ending")).toHaveCount(0);
+  expect(mockA.requests.every((r) => r.device !== mockB.requests[0]!.device)).toBe(true);
+  await b.ctx.close();
+});
+
+test("offline: no request, no ghost, no console error; back online, ghosts come back", async ({ page, context }) => {
+  const errors = consoleErrors(page);
+  const mock = await mockSuggest(page);
+  await openNewRoom(page);
+  await waitSynced(page);
+  await context.setOffline(true);
+  await page.getByTestId("add-thesis-LOC").click();
+  await page.keyboard.type("Space is the bigger");
+  await page.waitForTimeout(1500);
+  await expect(ghost(page)).toHaveCount(0);
+  expect(mock.requests).toHaveLength(0);
+  // typing works as before while offline
+  await page.keyboard.type(" payoff");
+  await expect(page.getByTestId("thesis-editor")).toHaveValue("Space is the bigger payoff");
+  await page.waitForTimeout(1000);
+  expect(mock.requests).toHaveLength(0);
+  expect(errors).toEqual([]);
+
+  await context.setOffline(false);
+  await page.keyboard.type(" for");
+  await expect(ghost(page)).toHaveText(LONG);
+  expect(mock.requests).toHaveLength(1);
+});
+
+test("Enter, Tab, Backspace and Backspace-on-empty do what they always did while a ghost shows", async ({ page }) => {
+  const errors = consoleErrors(page);
+  await mockSuggest(page);
+  await openNewRoom(page);
+  await page.getByTestId("add-thesis-LOC").click();
+  await page.keyboard.type("Space is the bigger");
+  await expect(ghost(page)).toHaveCount(1);
+  // Enter on a thesis title: its first card, the title keeps only the typed text
+  await page.keyboard.press("Enter");
+  await expect(ghost(page)).toHaveCount(0);
+  await expect(page.getByTestId("card-editor")).toBeFocused();
+  await expect(page.getByTestId("thesis-title")).toHaveText("Space is the bigger");
+
+  // Enter on a card: a new card below, the first keeps its text
+  await page.keyboard.type("Asteroid mining unlocks scarce");
+  await expect(ghost(page)).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(ghost(page)).toHaveCount(0);
+  expect(await laneLabels(page, "LOC")).toEqual(["OA1", "OA2"]);
+  await expect(card(page, "OA1")).toContainText("Asteroid mining unlocks scarce");
+  await expect(card(page, "OA1")).not.toContainText("running out of");
+  await expect(card(page, "OA2").getByTestId("card-editor")).toBeFocused();
+
+  // Tab on a card: it becomes a point of the card above, text unchanged
+  await page.keyboard.type("Platinum group metals are");
+  await expect(ghost(page)).toHaveText(" rare on Earth.");
+  await page.keyboard.press("Tab");
+  await expect(ghost(page)).toHaveCount(0);
+  const point = page.getByTestId("point-editor");
+  await expect(point).toBeFocused();
+  await expect(point).toHaveValue("Platinum group metals are");
+  expect(await laneLabels(page, "LOC")).toEqual(["OA1"]);
+
+  // Backspace deletes one character and drops the ghost (Tab asked for nothing: only typing does)
+  await page.waitForTimeout(1000);
+  await expect(ghost(page)).toHaveCount(0);
+  await page.keyboard.type("x");
+  await expect(ghost(page)).toHaveText(LONG);
+  await page.keyboard.press("Backspace");
+  await expect(point).toHaveValue("Platinum group metals are");
+  await expect(ghost(page)).not.toHaveText(LONG);
+
+  // emptied by hand, Backspace on the empty point removes it, as always
+  await expect(ghost(page)).toHaveText(" rare on Earth."); // the pause asked again
+  for (let i = 0; i < "Platinum group metals are".length; i++) await page.keyboard.press("Backspace");
+  await expect(point).toHaveValue("");
+  await expect(ghost(page)).toHaveCount(0);
+  await page.keyboard.press("Backspace");
+  await expect(card(page, "OA1").locator("[data-point-id]")).toHaveCount(0);
+  await expect(page.getByTestId("point-editor")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("Doc view: Enter and Tab with a ghost showing keep their meaning", async ({ page }) => {
+  await mockSuggest(page);
+  await openNewRoom(page, { view: "doc" });
+  await page.getByTestId("doc-add-thesis").click();
+  await page.keyboard.type("Space is the bigger");
+  await expect(ghost(page)).toHaveCount(1);
+  // Enter: a new thesis line below; the first keeps only what was typed
+  await page.keyboard.press("Enter");
+  await expect(ghost(page)).toHaveCount(0);
+  const theses = page.getByTestId("doc-editor-thesis");
+  await expect(theses).toHaveCount(2);
+  await expect(theses.nth(0)).toHaveValue("Space is the bigger");
+  await expect(theses.nth(1)).toBeFocused();
+  await expect(theses.nth(1)).toHaveValue("");
+  // Tab: the new line becomes card "a." of that thesis, text unchanged
+  await page.keyboard.type("Asteroid mining unlocks scarce");
+  await expect(ghost(page)).toHaveCount(1);
+  await page.keyboard.press("Tab");
+  await expect(ghost(page)).toHaveCount(0);
+  await expect(page.getByTestId("doc-editor-card")).toBeFocused();
+  await expect(page.getByTestId("doc-editor-card")).toHaveValue("Asteroid mining unlocks scarce");
+});
+
+test("touch: a tap on the gray text accepts it; the field keeps focus", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: false });
+  const page = await ctx.newPage();
+  const errors = consoleErrors(page);
+  await mockSuggest(page);
+  await openNewRoom(page);
+  await page.getByTestId("add-thesis-LOC").tap();
+  const thesis = page.getByTestId("thesis-editor");
+  await expect(thesis).toBeFocused();
+  await page.keyboard.type("Space is the bigger");
+  await expect(ghost(page)).toHaveText(" long-term payoff for humanity.");
+  await ghost(page).tap();
+  await expect(thesis).toHaveValue("Space is the bigger long-term payoff for humanity.");
+  await expect(thesis).toBeFocused();
+  await expect(ghost(page)).toHaveCount(0);
+
+  // in a narrow card the wrapping ghost is tappable too, and the tap starts no drag
+  await page.keyboard.press("Enter");
+  const cardEd = page.getByTestId("card-editor");
+  await page.keyboard.type("Asteroid mining unlocks scarce");
+  await expect(ghost(page)).toHaveText(" metals that Earth is running out of.");
+  await ghost(page).tap();
+  await expect(cardEd).toHaveValue("Asteroid mining unlocks scarce metals that Earth is running out of.");
+  await expect(cardEd).toBeFocused();
+  await expect(page.locator("body.dragging")).toHaveCount(0);
+  expect(await laneLabels(page, "LOC")).toEqual(["OA1"]);
+  expect(errors).toEqual([]);
+  await ctx.close();
+});
+
+test("Doc view: ↑ with a wrapping ghost goes to the line above, as it does with no ghost", async ({ page }) => {
+  await mockSuggest(page);
+  await openNewRoom(page, { view: "doc" });
+  await page.getByTestId("doc-add-thesis").click();
+  await page.keyboard.type("First thesis");
+  await page.keyboard.press("Enter");
+  // no REPLIES key matches, so the mock answers with the long ghost, which wraps in the line
+  await page.keyboard.type("Oceans hold most of the planet's unknown");
+  await expect(ghost(page)).toHaveCount(1);
+  const theses = page.getByTestId("doc-editor-thesis");
+  const one = await theses.nth(0).evaluate((el) => el.getBoundingClientRect().height);
+  expect(await theses.nth(1).evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(one);
+  await page.keyboard.press("ArrowUp");
+  await expect(theses.nth(0)).toBeFocused();
+  await expect(theses.nth(1)).toHaveValue("Oceans hold most of the planet's unknown");
 });

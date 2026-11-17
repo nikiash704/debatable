@@ -192,6 +192,12 @@ export function YTextEditor({
             return;
           }
           if (ghost.onKeyDown(e)) return;
+          // A wrapping ghost makes the field taller; line-based handlers (Doc view ↑/↓) must see the
+          // text's own height, so shrink back right away (the ghost is dismissed by this key anyway).
+          if ((e.key === "ArrowUp" || e.key === "ArrowDown") && mirror.current && ref.current) {
+            ref.current.style.height = "0px";
+            ref.current.style.height = `${ref.current.scrollHeight}px`;
+          }
           onKeyDown?.(e);
         }}
         onBlur={() => {

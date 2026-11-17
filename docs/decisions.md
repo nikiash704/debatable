@@ -275,6 +275,9 @@ and **no other change to the app or its interface**. Defaults taken from the pla
     provider). Provisional until the benchmark runs against the deployed Worker.
 11. (Claude) The model repeats the note's last word and the client strips it, which gets spacing right both
     mid-word and after a space. At most 15 words, cut at the first sentence end.
+12. (Claude) Limits on the shared free budget: 950 calls per UTC day and 20 per minute for everyone, 6 per minute
+    per device, 15 per minute and 400 per day per IP (so one client cannot switch suggestions off for everyone).
+    Over a limit there is simply no gray text.
 
 ## Open
 
