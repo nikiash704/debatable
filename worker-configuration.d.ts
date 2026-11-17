@@ -3,11 +3,14 @@
 // Runtime types generated with workerd@1.20261110.1 2026-11-01
 interface __BaseEnv_Env {
 	Room: DurableObjectNamespace<import("./worker/index").Room>;
+	SuggestQuota: DurableObjectNamespace<import("./worker/index").SuggestQuota>;
+	/** OpenRouter key for AI suggestions: a Worker secret (`wrangler secret put`), `.dev.vars` locally. */
+	API_KEY_OPENROUTER: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./worker/index");
-		durableNamespaces: "Room";
+		durableNamespaces: "Room" | "SuggestQuota";
 	}
 	interface Env extends __BaseEnv_Env {}
 }

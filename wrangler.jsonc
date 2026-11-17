@@ -8,8 +8,15 @@
     "run_worker_first": ["/api/*", "/parties/*"]
   },
   "durable_objects": {
-    "bindings": [{ "name": "Room", "class_name": "Room" }]
+    "bindings": [
+      { "name": "Room", "class_name": "Room" },
+      // one global counter for the shared OpenRouter free-tier quota (AI suggestions)
+      { "name": "SuggestQuota", "class_name": "SuggestQuota" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["SuggestQuota"] }
+  ],
   "observability": { "enabled": true }
 }

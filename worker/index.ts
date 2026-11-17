@@ -2,8 +2,28 @@ import { getServerByName, routePartykitRequest } from "partyserver";
 import type { ClaimRequest, ClaimResponse, RoomInfo } from "../src/shared/api";
 import { isValidCode } from "../src/shared/code";
 import { Room } from "./room";
+import { createSuggestHandler, workersCache } from "./suggest";
+import { SuggestQuota } from "./suggest-quota";
 
-export { Room };
+export { Room, SuggestQuota };
+
+/** One per isolate: keeps its small in-memory caches (known rooms, recent answers). */
+const suggest = createSuggestHandler();
+
+function handleSuggest(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
+  const quota = () => env.SuggestQuota.get(env.SuggestQuota.idFromName("global"));
+  return suggest(request, {
+    apiKey: env.API_KEY_OPENROUTER,
+    fetch: (input, init) => fetch(input, init),
+    roomExists: async (code) => (await (await getServerByName(env.Room, code)).info()).exists,
+    quota: {
+      take: (device, ip) => quota().take(device, ip),
+      backoff: (until) => quota().backoff(until),
+    },
+    cache: workersCache(url.origin),
+    waitUntil: (p) => ctx.waitUntil(p),
+  });
+}
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -11,8 +31,9 @@ const json = (data: unknown, status = 200) =>
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 
-async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
+async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   if (url.pathname === "/api/health") return json({ ok: true, app: "debatable" });
+  if (url.pathname === "/api/suggest") return handleSuggest(request, env, ctx, url);
 
   const m = url.pathname.match(/^\/api\/rooms\/([^/]+)(\/claim)?$/);
   if (!m) return json({ error: "not found" }, 404);
@@ -38,9 +59,9 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return handleApi(request, env, url);
+    if (url.pathname.startsWith("/api/")) return handleApi(request, env, ctx, url);
     return (await routePartykitRequest(request, env)) ?? new Response("Not found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
