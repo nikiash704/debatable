@@ -266,6 +266,15 @@ and **no other change to the app or its interface**. Defaults taken from the pla
 6. Key: read as a Worker secret, `env.API_KEY_OPENROUTER`. (If it turns out to be in the account
    Secrets Store, a `secrets_store_secrets` binding is needed instead.)
 7. The client sends structured context (`src/shared/suggest.ts`), the Worker builds the prompt.
+8. (Claude, while building) On narrow board cards a wrapping ghost would overlap the card border and the content
+   below, so the field grows to fit it while it shows (exactly as if typed) and returns to its height when the
+   ghost goes. With no ghost showing, layout is unchanged.
+9. (Claude) The OpenRouter app is created hidden (`X-OpenRouter-App-Visibility: hidden`): not listed in public
+   rankings. This can only be changed later through OpenRouter support.
+10. (Claude) Model order: Gemma 4 26B A4B → Nemotron 3.5 Lightning → Gemma 4 31B (the second try is on another
+    provider). Provisional until the benchmark runs against the deployed Worker.
+11. (Claude) The model repeats the note's last word and the client strips it, which gets spacing right both
+    mid-word and after a space. At most 15 words, cut at the first sentence end.
 
 ## Open
 

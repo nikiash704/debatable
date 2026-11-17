@@ -65,6 +65,8 @@ Full reasoning in `docs/decisions.md` ("Tech stack").
   synced through **`y-partyserver`**; **`y-indexeddb`** keeps a local copy for offline-first use.
 - Drag and drop: own pointer code (mouse, touch long press, Alt+↑/↓), no library; the drop preview
   is the engine's own row layout.
+- AI sentence suggestions: **OpenRouter** free models called from the Worker (`POST /api/suggest`,
+  key in the `API_KEY_OPENROUTER` Worker secret); a global quota counter in a Durable Object.
 - **Vitest** for the flow engine, **Playwright** for end-to-end tests.
 
 ## Project layout
@@ -75,7 +77,8 @@ Full reasoning in `docs/decisions.md` ("Tech stack").
 | `src/engine/` | Pure TypeScript flow engine (unit-tested): stages, numbering, carry-over, commands; stage 2: rows (`rows.ts`), answer links / statuses / counters (`clash.ts`), prep timer (`timer.ts`), drag moves (`moves.ts`) |
 | `src/sync/` | Yjs document schema, room session (IndexedDB + live sync + presence), device storage |
 | `src/ui/` | React UI: board (row grid), clash lines (`Arrows.tsx`), Doc view, prep timer, drag (`drag.ts`), top bar, stage bar, setup panel, palette; `components/` = design system pieces |
-| `worker/` | Cloudflare Worker + `Room` Durable Object (Yjs server, persistence, code reservation) |
+| `worker/` | Cloudflare Worker + `Room` Durable Object (Yjs server, persistence, code reservation); `/api/suggest` + `SuggestQuota` Durable Object (AI suggestions) |
+| `scripts/` | Benchmark for the AI suggestion models (`bench-suggest.ts`) |
 | `e2e/` | Playwright tests: `flow.spec.ts` (feature 02 stage 1), `clash.spec.ts` (stage 2), `rooms.spec.ts` (feature 01), touch |
 | `docs/` | Specs, decisions, design notes, Figma reference cache, progress |
 

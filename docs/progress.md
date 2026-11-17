@@ -16,6 +16,7 @@ Live app: **https://debatable.nikiash704.workers.dev**
 | Feature 02, stage 1 | Done; 10/10 criteria. |
 | **Feature 02, stage 2 (clash)** | **Done; 13/13 criteria of the stage-2 brief** (see below). Defaults await the user's review: `docs/decisions.md` → "Stage 2 defaults". |
 | Feature 02, stage 3 | Not started. |
+| **AI sentence suggestions** (17.11.2026) | **Built, not deployed, models not yet measured.** Plan `docs/plans/ai-suggestions.md`, benchmark `docs/plans/ai-suggestions-bench.md`, defaults in `docs/decisions.md`. Branch `claude/trusting-einstein-zte72n`. |
 
 ### Stage 2 milestones
 - **M0 Deploy** — stage 1 deployed 10.11.2026, then stage 2 (same URL).
@@ -29,6 +30,22 @@ Live app: **https://debatable.nikiash704.workers.dev**
 - **M3 Doc view + prep timer** — `src/ui/DocView.tsx`, `src/ui/PrepTimer.tsx`; Board / Doc switch (D).
 - **M4 Drag and drop** — `src/ui/drag.ts` (mouse, touch long press, Alt+↑/↓), FLIP in `Board.tsx`.
 - **M5 Verify and ship** — all tests green on the production build; deployed.
+
+## AI sentence suggestions (17.11.2026)
+
+Gray ghost text after the caret that finishes the current sentence, in every round text field (cards, points,
+thesis titles, Doc view lines, motion). → at the end of the text or a tap on the gray text accepts it.
+- Client: `src/ui/YTextEditor.tsx` + `src/ui/suggest/` (trigger rules, type-through, cache, client, context).
+- Worker: `POST /api/suggest` (`worker/suggest.ts`), global quota Durable Object `SuggestQuota`
+  (`worker/suggest-quota.ts`, migration v2), prompt built server-side (`src/shared/suggest-prompt.ts`).
+- Models (`src/config/suggest.ts`): `gemma-4-26b-a4b-it:free` → `nemotron-3.5-lightning:free` →
+  `gemma-4-31b-it:free`. Provisional: the key is only a Cloudflare Worker secret, so the benchmark runs
+  against the deployed Worker (`node scripts/bench-suggest.ts --base <url> --n 20`).
+- To ship: `npm run deploy` (needs the `API_KEY_OPENROUTER` Worker secret; without it the endpoint stays
+  silent), run the benchmark, put the winners in `src/config/suggest.ts`, deploy again.
+- Local dev with real suggestions: `API_KEY_OPENROUTER=…` in `.dev.vars` (git-ignored). Tests always mock.
+- Known small issues: accepting within 0.6 s of typed-through letters undoes together with them; the ghost is
+  not struck through on struck cards.
 
 ## Tests (all passing)
 
@@ -80,7 +97,7 @@ SQLite-backed Durable Objects). The laptop is logged in (`wrangler login`); a cl
    no incoming answer, hint for LOR). Room is left: `groupId` is stored, rows are per lane, the stage bar has
    space for more pills.
 4. Later: speech timer + POI status (config has `poiWindow`, `graceSeconds`; the prep timer's slot is the
-   speech timer's), brainstorm rail, hint tooltip, word suggestions, Feedback screen, AI features.
+   speech timer's), brainstorm rail, hint tooltip, word suggestions, Feedback screen, more AI features (sentence suggestions are built).
 5. Mouse drag inside the Doc view (keyboard Alt+↑/↓ works there now).
 6. BP / AP configs: add files next to `src/config/formats/apda.ts` (engine unchanged).
 7. Final participant-name list (open question in spec 01) → `src/config/names.ts`.
