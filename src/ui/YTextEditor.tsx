@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import * as Y from "yjs";
 import { LOCAL } from "../sync/doc";
 import type { SuggestInput } from "../shared/suggest";
+import { useGhost } from "./suggest/useGhost";
 
 export interface YTextEditorProps {
   ytext: Y.Text;
@@ -27,6 +28,11 @@ export interface YTextEditorProps {
  * A textarea bound to a Y.Text: local typing is applied as a character diff, remote changes are
  * merged in while keeping the caret in place (relative positions). Two people can type in the same
  * card at once and both texts survive.
+ *
+ * With `suggest`, a typing pause at the end of a sentence shows an AI continuation as gray "ghost"
+ * text after the caret (plan: docs/plans/ai-suggestions.md). The ghost is drawn by a mirror layer
+ * over the textarea that is absolutely positioned, so the textarea's size (autosize) never sees it;
+ * → at the end, or a tap on the gray text, accepts it through the normal typing path.
  */
 export function YTextEditor({
   ytext,
@@ -42,6 +48,7 @@ export function YTextEditor({
   testId,
   ariaLabel,
   rows = 1,
+  suggest,
 }: YTextEditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
@@ -78,6 +85,7 @@ export function YTextEditor({
       else el.setSelectionRange(n, n);
     }
     rememberSelection();
+    ghost.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytext]);
 
@@ -87,6 +95,8 @@ export function YTextEditor({
     const observer = (_e: Y.YTextEvent, tr: Y.Transaction) => {
       // our own keystrokes are already in the textarea
       if (tr.origin === LOCAL && tr.local && el.value === ytext.toString()) return;
+      // someone else changed this text (or an undo did): the suggestion no longer fits
+      ghost.clear();
       const doc = ytext.doc;
       const focused = document.activeElement === el;
       let start = 0;
@@ -102,6 +112,7 @@ export function YTextEditor({
     ytext.observe(observer);
     const onSel = () => {
       if (document.activeElement === el) rememberSelection();
+      ghost.onSelection();
     };
     document.addEventListener("selectionchange", onSel);
     return () => {
@@ -132,7 +143,13 @@ export function YTextEditor({
     rememberSelection();
   };
 
+  const ghost = useGhost({ ref, composing, suggest, commit: pushDiff });
+  const view = ghost.view;
+
+  // The wrapper is a plain block (no box of its own), so the page lays out exactly as with a bare
+  // textarea; it only becomes a positioning context while a ghost is shown.
   return (
+    <div className={view ? "ed-wrap ed-wrap--ghost" : "ed-wrap"}>
     <textarea
       ref={ref}
       className={`ed${className ? ` ${className}` : ""}`}
@@ -141,13 +158,18 @@ export function YTextEditor({
       spellCheck
       data-testid={testId}
       aria-label={ariaLabel}
-      onInput={pushDiff}
+      onInput={() => {
+        pushDiff();
+        ghost.onInput();
+      }}
       onCompositionStart={() => {
         composing.current = true;
+        ghost.clear();
       }}
       onCompositionEnd={() => {
         composing.current = false;
         pushDiff();
+        ghost.onInput();
       }}
       onKeyDown={(e) => {
         const mod = e.metaKey || e.ctrlKey;
@@ -162,13 +184,33 @@ export function YTextEditor({
           onRedo?.();
           return;
         }
+        if (ghost.onKeyDown(e)) return;
         onKeyDown?.(e);
       }}
-      onBlur={onBlur}
+      onBlur={() => {
+        ghost.clear();
+        onBlur?.();
+      }}
       onFocus={onFocus}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     />
+    {view && (
+      <div className="ed-ghost" aria-hidden="true">
+        <span className="ed-ghost__text">{view.text}</span>
+        <span
+          className="ed-ghost__rest"
+          data-testid="ghost"
+          onPointerDown={ghost.onGhostPointerDown}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {view.ghost}
+        </span>
+      </div>
+    )}
+    </div>
   );
 }
