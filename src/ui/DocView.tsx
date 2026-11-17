@@ -22,6 +22,7 @@ import type { Peer, RoomSession } from "../sync/session";
 import { randomId } from "../sync/storage";
 import type { Controller } from "./controller";
 import { MOD } from "./keys";
+import { suggestFromSession } from "./suggest/context";
 import { YTextEditor } from "./YTextEditor";
 
 const newId = () => randomId(12);
@@ -218,6 +219,7 @@ export function DocView({ c, session, peers }: { c: Controller; session: RoomSes
                         if (!(selected && c.ui.editing)) c.select(focusOf(l), true);
                       }}
                       onKeyDown={(e) => onKey(e, l, i)}
+                      suggest={() => suggestFromSession(session, focusOf(l), { doc: true })}
                     />
                   )}
                 </div>

@@ -141,7 +141,7 @@ without going through the lead. This avoids merge conflicts when they work in pa
 | 1 | **Cloudflare API engineer** | Workers, secrets, Durable Objects, rate limiting | `worker/suggest.ts`, `/api/suggest` route in `worker/index.ts`, `wrangler.jsonc` bindings, `worker-configuration.d.ts` | Endpoint calling OpenRouter with the key, quota guard, cache, abuse protection |
 | 2 | **LLM evaluation & prompt engineer** | Model benchmarking, prompt design | `src/shared/suggest-prompt.ts` (prompt builder, pure), `src/config/suggest.ts` (models, limits), `scripts/bench-suggest.ts`, `docs/plans/ai-suggestions-bench.md` | The chosen model + fallbacks with numbers, the prompt, post-processing rules |
 | 3 | **Editor / ghost-text engineer** | React, textarea internals, IME, caret math | `src/ui/YTextEditor.tsx`, new `src/ui/suggest/*` (client hook, cache, trigger logic), ghost CSS in `app.css` | Gray inline continuation in every `YTextEditor`, accept / dismiss behaviour |
-| 4 | **Flow-context engineer** | The engine and Yjs doc model | `src/ui/suggest/context.ts`, the `suggestContext` prop passed at the 5 call sites | The structured context for each field (motion, side, speech, thesis, answered card, neighbours) |
+| 4 | **Flow-context engineer** | The engine and Yjs doc model | `src/ui/suggest/context.ts`, the `suggest` prop passed at the 5 call sites | The structured context for each field (motion, side, speech, thesis, answered card, neighbours) |
 | 5 | **QA & review** | Vitest, Playwright, security review | `src/**/*.test.ts` for the new code, `e2e/suggest.spec.ts` | Tests, "nothing else changed" proof, security/abuse review |
 
 Why this split: the model/prompt work and the UI work are independent once the API contract is
@@ -235,7 +235,7 @@ Phase 4  Lead: docs, commit, deploy (only with the user's go-ahead)
 - A pure function that, given the session, flow and the field being edited, returns the
   `context` object of the contract: motion, our side, the column's speech, the thesis title, the
   text of answered opponent cards (`respondsTo`), a few sibling card titles.
-- Adds an optional `suggestContext` prop to `YTextEditor` and passes it at the 5 call sites
+- Adds an optional `suggest` prop to `YTextEditor` and passes it at the 5 call sites
   (the only edits outside the editor, and they change no behaviour).
 - Done: unit tests on the "Ocean vs Space" board for each field kind.
 

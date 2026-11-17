@@ -11,6 +11,7 @@ import { Lane } from "./components/Lane";
 import type { Controller } from "./controller";
 import type { DragApi } from "./drag";
 import { MOD } from "./keys";
+import { suggestFromSession } from "./suggest/context";
 import { YTextEditor } from "./YTextEditor";
 
 interface BoardProps {
@@ -358,6 +359,7 @@ function ThesisHead({
               onUndo={c.undo}
               onRedo={c.redo}
               onKeyDown={(e) => editorKeys(e, c, { kind: "thesis", id: t.id }, col.speech.id, ytext.toString())}
+              suggest={() => suggestFromSession(session, { kind: "thesis", id: t.id, speech: col.speech.id })}
             />
           </div>
         ) : (
@@ -564,6 +566,7 @@ function CardItem({ vm, col, c, session, peers, focus, drag }: { vm: CardVM; col
               onUndo={c.undo}
               onRedo={c.redo}
               onKeyDown={(e) => editorKeys(e, c, { kind: "card", id: card.id }, col.speech.id, ytext.toString())}
+              suggest={() => suggestFromSession(session, { kind: "card", id: card.id })}
             />
           ) : undefined
         }
@@ -583,6 +586,7 @@ function CardItem({ vm, col, c, session, peers, focus, drag }: { vm: CardVM; col
                 onUndo={c.undo}
                 onRedo={c.redo}
                 onKeyDown={(e) => editorKeys(e, c, { kind: "point", cardId: card.id, pointId: p.id }, col.speech.id, pt.toString())}
+                suggest={() => suggestFromSession(session, { kind: "point", cardId: card.id, pointId: p.id })}
               />
             ) : undefined,
           };

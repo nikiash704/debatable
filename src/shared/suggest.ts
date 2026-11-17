@@ -36,6 +36,8 @@ export interface SuggestRequest {
   /** Text of the field up to the caret (the client sends at most SUGGEST_LIMITS.before chars). */
   before: string;
   context: SuggestContext;
+  /** Benchmark only: ask one model instead of the fallback list. Must be in SUGGEST_CONFIG.benchModels. */
+  model?: string;
 }
 
 export interface SuggestResponse {
@@ -55,4 +57,4 @@ export const SUGGEST_LIMITS = {
 } as const;
 
 /** What a field needs to ask for a suggestion; `before` and `device` are filled in by the editor. */
-export type SuggestInput = Omit<SuggestRequest, "before" | "device">;
+export type SuggestInput = Omit<SuggestRequest, "before" | "device" | "model">;

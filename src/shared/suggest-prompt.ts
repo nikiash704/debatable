@@ -36,7 +36,7 @@ export function buildMessages(req: Pick<SuggestRequest, "field" | "before" | "co
   const c = req.context;
   const lines: string[] = [];
   if (c.motion) lines.push(`Motion: ${c.motion}`);
-  lines.push(`Format: ${c.format}. Writing for side: ${c.side}${c.speech ? `, speech: ${c.speech}` : ""}.`);
+  lines.push(`Format: ${c.format}. This is the flow (notes) kept by the ${c.side} side${c.speech ? `; the note sits in the column of the ${c.speech} speech` : ""}.`);
   if (c.thesis) lines.push(`Thesis: ${c.thesis}`);
   if (c.card) lines.push(`Argument this point supports: ${c.card}`);
   if (c.answers?.length) lines.push(`This answers the opponent's argument(s): ${c.answers.map((a) => `"${a}"`).join("; ")}`);

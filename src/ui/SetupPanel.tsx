@@ -4,6 +4,7 @@ import { getFormat } from "../config/formats";
 import { motionText, setRoomField, setSpeechTime } from "../sync/doc";
 import type { RoomSession } from "../sync/session";
 import { formatMinutes } from "./components/Lane";
+import { suggestFromSession } from "./suggest/context";
 import { YTextEditor } from "./YTextEditor";
 
 interface SetupPanelProps {
@@ -79,7 +80,7 @@ export function SetupPanel({ session, f, side, role, times, prepMinutes, onRole,
           <span className="field__hint">Paste or type</span>
         </div>
         <div className="textarea" style={{ minHeight: 64 }}>
-          <YTextEditor ytext={motionText(session.doc)} placeholder="This House would…" testId="motion-input" ariaLabel="Motion" onUndo={() => session.undo.undo()} onRedo={() => session.undo.redo()} />
+          <YTextEditor ytext={motionText(session.doc)} placeholder="This House would…" testId="motion-input" ariaLabel="Motion" onUndo={() => session.undo.undo()} onRedo={() => session.undo.redo()} suggest={() => suggestFromSession(session, { kind: "motion" })} />
         </div>
       </div>
       <div className="field">

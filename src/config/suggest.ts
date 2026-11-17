@@ -6,6 +6,16 @@
 export const SUGGEST_CONFIG = {
   /** Tried in order via OpenRouter's `models` fallback list. Free (`:free`) models only. */
   models: ["google/gemma-4-26b-a4b-it:free", "google/gemma-4-31b-it:free", "nvidia/nemotron-3.5-lightning:free"],
+  /** Models the benchmark may ask one by one through /api/suggest (`model` field). Free only. */
+  benchModels: [
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "inclusionai/ling-3.2-flash:free",
+    "dots-studio/dots-3-note-preview:free",
+    "baidu/ernie-5.5-flash-preview:free",
+    "nvidia/nemotron-3.5-super-vl:free",
+  ],
   maxTokens: 40,
   temperature: 0.3,
   /** Upstream timeout in the Worker, ms. */
