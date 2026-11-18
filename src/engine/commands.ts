@@ -1,4 +1,6 @@
 import type { FormatConfig, SpeechId, TagType } from "../config/types";
+import { autoAnswerOps, isBlank, syncExtensions } from "./auto";
+import { applyOps } from "./ops";
 import { nextNumber, thesesOf } from "./numbering";
 import type { Op } from "./ops";
 import { byOrder, keyBetween, keysBetween } from "./order";
@@ -108,7 +110,8 @@ export function createCard(f: FormatConfig, state: FlowState, slot: Slot, newId:
   if (!sp || columnState(f, state.perspective, sp, state.stage) === "future") return { ops: [] };
   const card = newCard(f, state, slot, newId(), text);
   if (!card) return { ops: [] };
-  return { ops: [{ t: "card.create", card }], focus: { kind: "card", id: card.id, edit: true } };
+  // an opponent argument gets an empty answer slot of ours at once (with its arrow)
+  return { ops: [{ t: "card.create", card }, ...autoAnswerOps(f, state, card, newId)], focus: { kind: "card", id: card.id, edit: true } };
 }
 
 /** Enter: a new card right below this one, in the same group. */
@@ -127,19 +130,32 @@ export function deleteCard(state: FlowState, cardId: string): Result {
     if (other.tags.some((t) => t.refCardId === cardId)) {
       ops.push({ t: "card.update", id: other.id, patch: { tags: other.tags.filter((t) => t.refCardId !== cardId) } });
     }
-    if (other.respondsTo.includes(cardId)) ops.push({ t: "card.unlink", id: other.id, target: cardId });
+    if (other.respondsTo.includes(cardId)) {
+      // an empty slot that only answered this card goes with it
+      if (isBlank(other) && other.respondsTo.length === 1) ops.push({ t: "card.delete", id: other.id });
+      else ops.push({ t: "card.unlink", id: other.id, target: cardId });
+    }
   }
   return { ops };
 }
 
 /** Click in speech mode / Cmd+Enter: said ↔ not said, in the current speech. Only our cards. */
-export function toggleSaid(f: FormatConfig, state: FlowState, cardId: string): Result {
+/**
+ * "Made" (said) ↔ not made. Our cards only. The speech is the current one when it is ours, otherwise the
+ * card's own column (so "Made" works at any stage). Our rebuttal's extension slots follow (see auto.ts).
+ */
+export function toggleSaid(f: FormatConfig, state: FlowState, cardId: string, newId?: IdGen): Result {
   const c = find(state, cardId);
-  const sp = currentSpeech(f, state.stage);
+  const cur = currentSpeech(f, state.stage);
   if (!c || c.side !== state.perspective) return { ops: [] };
-  if (c.saidIn) return { ops: [{ t: "card.update", id: c.id, patch: { saidIn: null } }] };
-  if (!sp) return { ops: [] };
-  return { ops: [{ t: "card.update", id: c.id, patch: { saidIn: sp.id } }] };
+  const sp = cur && cur.side === state.perspective ? cur : speechById(f, c.ownerSpeech);
+  const ops: Op[] = c.saidIn
+    ? [{ t: "card.update", id: c.id, patch: { saidIn: null } }]
+    : sp
+      ? [{ t: "card.update", id: c.id, patch: { saidIn: sp.id } }]
+      : [];
+  if (ops.length && newId) ops.push(...syncExtensions(f, applyOps(state, ops), newId));
+  return { ops };
 }
 
 export function toggleStrong(state: FlowState, cardId: string): Result {

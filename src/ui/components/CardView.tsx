@@ -49,6 +49,12 @@ export interface CardViewProps extends Omit<HTMLAttributes<HTMLDivElement>, "chi
   meta?: string | null;
   /** Extra content after the card (e.g. the "no target · L" hint). */
   hint?: ReactNode;
+  /** "Responding to" (answers) or "Extends" (our rebuttal point on our own argument). */
+  respondingVerb?: string;
+  /** Our cards: the always-visible "Made" (said) button. */
+  made?: { on: boolean; onClick: () => void; tip: string; hotkey: string } | null;
+  /** Empty automatic slot (answer / extension): quieter look. */
+  blank?: boolean;
 }
 
 /**
@@ -78,6 +84,9 @@ export function CardView({
   responding,
   meta,
   hint,
+  respondingVerb = "Responding to",
+  made,
+  blank,
   className,
   style,
   ...rest
@@ -90,6 +99,7 @@ export function CardView({
     !editing && partner && "card--partner",
     struck && "card--struck",
     speech && "card--speech",
+    blank && !editing && "card--blank",
     className,
   ]
     .filter(Boolean)
@@ -126,7 +136,7 @@ export function CardView({
         </span>
         {answering ? (
           <span className="card__resp" data-testid="card-responding">
-            Responding to{" "}
+            {respondingVerb}{" "}
             {responding!.map((r, i) => (
               <span key={`${r.label}-${i}`}>
                 {i > 0 && ", "}
@@ -141,6 +151,24 @@ export function CardView({
           <span className="card__star" aria-label="Strong" data-testid="card-strong">
             ★
           </span>
+        )}
+        {made && (
+          <button
+            type="button"
+            className={`made${made.on ? " made--on" : ""}`}
+            aria-pressed={made.on}
+            data-testid="made"
+            data-tip={made.tip}
+            data-key={made.hotkey}
+            onPointerDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              made.onClick();
+            }}
+          >
+            {made.on ? "✓ Made" : "Made"}
+          </button>
         )}
       </div>
       {answering && titleEl}

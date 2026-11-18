@@ -46,7 +46,7 @@ export function usePrepTimer(session: RoomSession, f: FormatConfig, snap: RoomSn
       tick((n) => n + 1);
       const live = session.getSnapshot();
       if (shouldAdvance({ isPrep: live.stage === f.prepStage.id, timer, advancedRun: live.prepAdvanced, now, enabled })) {
-        const ops = planStageChange(f, live.flow, stageAt(f, 1));
+        const ops = planStageChange(f, live.flow, stageAt(f, 1), () => randomId(12));
         session.advancePrep(timer.runId, f.prepStage.id, ops);
       }
     };

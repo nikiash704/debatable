@@ -1,4 +1,5 @@
 import type { FormatConfig, SpeechId } from "../config/types";
+import { autoAnswerOps, blankAnswerFor, isBlank, isExtensionColumn } from "./auto";
 import { newCard, type IdGen, type Result, type Slot } from "./commands";
 import type { Op } from "./ops";
 import type { RowLayout } from "./rows";
@@ -12,11 +13,13 @@ import type { Card, FlowState } from "./types";
 
 const find = (state: FlowState, id: string) => state.cards.find((c) => c.id === id) ?? null;
 
-/** Can `cardId` answer `targetId`? Other side, strictly earlier speech, both exist. */
+/** Can `cardId` answer `targetId`? Other side (or, from a rebuttal, own side), strictly earlier speech. */
 export function canLink(f: FormatConfig, state: FlowState, cardId: string, targetId: string): boolean {
   const a = find(state, cardId);
   const t = find(state, targetId);
-  if (!a || !t || a.id === t.id || a.side === t.side) return false;
+  if (!a || !t || a.id === t.id) return false;
+  // same side only for a rebuttal extending an earlier argument of its side (LOR ← OA1)
+  if (a.side === t.side && !isExtensionColumn(f, a.ownerSpeech)) return false;
   const ia = speechIndex(f, a.ownerSpeech);
   const it = speechIndex(f, t.ownerSpeech);
   return ia >= 0 && it >= 0 && it < ia;
@@ -51,12 +54,17 @@ export function answerPlace(f: FormatConfig, state: FlowState, targetId: string)
 
 /** R / "↩ Answer": a new empty card linked to the target, in the right column, ready to type. */
 export function answerCard(f: FormatConfig, state: FlowState, targetId: string, newId: IdGen): Result {
+  // the automatic empty answer slot is reused
+  const blank = blankAnswerFor(f, state, targetId);
+  if (blank) return { ops: [], focus: { kind: "card", id: blank.id, edit: true } };
   const place = answerPlace(f, state, targetId);
   if (!place.ok) return { ops: [] };
   const card = newCard(f, state, place.slot, newId());
   if (!card) return { ops: [] };
+  const created = { ...card, respondsTo: [targetId] };
   return {
-    ops: [{ t: "card.create", card: { ...card, respondsTo: [targetId] } }],
+    // answering our argument creates an opponent card (MG1 ← OA1), which gets its own answer slot
+    ops: [{ t: "card.create", card: created }, ...autoAnswerOps(f, state, created, newId)],
     focus: { kind: "card", id: card.id, edit: true },
   };
 }
@@ -103,7 +111,8 @@ export type AnswerStatus = "answered" | "unanswered" | "unanswerable";
 export function answerStatus(f: FormatConfig, state: FlowState): Map<string, AnswerStatus> {
   const persp = state.perspective;
   const answered = new Set<string>();
-  for (const c of state.cards) if (c.side === persp) for (const t of c.respondsTo) answered.add(t);
+  // empty answer slots are not answers
+  for (const c of state.cards) if (c.side === persp && !isBlank(c)) for (const t of c.respondsTo) answered.add(t);
   const lastOurs = f.speeches.reduce((m, s, i) => (s.side === persp ? i : m), -1);
   const out = new Map<string, AnswerStatus>();
   for (const c of state.cards) {

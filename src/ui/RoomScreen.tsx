@@ -10,7 +10,7 @@ import { DocView } from "./DocView";
 import { useBoardDrag } from "./drag";
 import { PrepTimerBar, usePrepTimer, type PrepTimerApi } from "./PrepTimer";
 import { copyText, InviteBanner, StageBar, TopBar } from "./Chrome";
-import { useController, type Controller } from "./controller";
+import { SPEECH_MODE, useController, type Controller } from "./controller";
 import { isTyping, MOD } from "./keys";
 import { CardPicker, CommandPalette, type Command } from "./Palette";
 import { inviteLink } from "./router";
@@ -250,7 +250,7 @@ function useCommands(c: Controller, extra: { prep: PrepTimerApi | null; openSetu
     { id: "prev-stage", label: "Previous stage", hotkey: "[", group: "Stages", run: c.prev },
   );
   for (const s of stagesOf(f)) list.push({ id: `stage-${s.id}`, label: `Go to ${s.label}`, group: "Stages", run: () => c.goStage(s.id) });
-  if (c.canSpeechMode) list.push({ id: "speech-mode", label: c.speechMode ? "Speech mode off" : "Speech mode on", hotkey: "M", group: "Stages", run: c.toggleSpeechMode });
+  if (c.canSpeechMode && SPEECH_MODE) list.push({ id: "speech-mode", label: c.speechMode ? "Speech mode off" : "Speech mode on", hotkey: "M", group: "Stages", run: c.toggleSpeechMode });
   list.push(
     { id: "new-card", label: card ? "New card below" : "New card", hotkey: "A", group: "Cards", run: () => c.addBelow(cardId) },
     { id: "new-thesis", label: "New thesis", group: "Cards", run: () => c.addThesis(sel?.kind === "thesis" ? sel.id : card?.card.thesisId ?? null) },
@@ -288,7 +288,7 @@ function useCommands(c: Controller, extra: { prep: PrepTimerApi | null; openSetu
   }
   for (const v of c.board.unanswered.slice(0, 12)) list.push({ id: `goto-${v.card.id}`, label: `Go to unanswered ${v.label}`, group: "Clash", run: () => c.jumpTo(v.card.id) });
   if (card) {
-    if (card.ours) list.push({ id: "said", label: card.card.saidIn ? "Mark not said" : "Mark said", hotkey: c.speechMode ? `Space · ${MOD}↵` : `${MOD}↵`, group: "Card", run: () => c.said(card.card.id) });
+    if (card.ours) list.push({ id: "said", label: card.card.saidIn ? "Mark not made" : "Mark made", hotkey: c.speechMode ? `Space · ${MOD}↵` : `M · ${MOD}↵`, group: "Card", run: () => c.said(card.card.id) });
     list.push(
       { id: "strong", label: card.card.strong ? "Not strong" : "Strong", hotkey: "S", group: "Card", run: () => c.strong(card.card.id) },
       { id: "add-point", label: "Add point", hotkey: "Enter, Tab", group: "Card", run: () => c.addPointTo(card.card.id) },
@@ -443,7 +443,9 @@ function useHotkeys(
       }
       const key = k.length === 1 ? k.toLowerCase() : k;
       if (key === "m") {
-        c.toggleSpeechMode();
+        // M = Made on the selected card of ours (speech mode is off for now)
+        if (SPEECH_MODE) c.toggleSpeechMode();
+        else if (cardId && c.board.cards.get(cardId)?.ours) c.said(cardId);
         return handled();
       }
       if (key === "a") {

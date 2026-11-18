@@ -1,4 +1,6 @@
 import type { FormatConfig, SpeechId } from "../config/types";
+import { isBlank } from "./auto";
+import { canLink } from "./clash";
 import type { Op } from "./ops";
 import { byOrder, keyBetween, thesesOf } from "./order";
 import type { RowLayout } from "./rows";
@@ -22,6 +24,9 @@ export interface CardSlot {
   order: string;
   /** For pointer hit-testing: the edge of a card, or the header of an empty thesis. */
   anchor: { cardId: string; edge: "top" | "bottom" } | { thesisId: string } | null;
+  /** Row slot: the card answers the argument directly to its left in that row (see `relinkOps`). */
+  ops?: Op[];
+  row?: number;
 }
 
 export interface CardDrag {
@@ -35,7 +40,128 @@ export interface CardDrag {
   current: number;
 }
 
+/**
+ * Card drag slots. An answer (a linked card, or an unlinked card in our responses / rebuttal) can also be
+ * dropped into any other row that has an argument it can answer directly to its left: it then answers
+ * that argument, and the answers below shift down one row each (see `relinkOps`).
+ */
 export function cardDrag(f: FormatConfig, state: FlowState, layout: RowLayout, cardId: string): CardDrag | null {
+  const base = baseCardDrag(f, state, layout, cardId);
+  if (!base) return null;
+  const rows = answerRows(f, state, layout, cardId);
+  if (!rows) return base;
+  const curRow = layout.parent.get(cardId) ? (layout.rowOf.get(cardId) ?? -1) : -1;
+  const rowSlots: CardSlot[] = rows.slots
+    .filter((x) => x.row !== curRow)
+    .map((x) => ({
+      key: `row:${x.row}`,
+      thesisId: null,
+      before: null,
+      order: "",
+      anchor: { cardId: x.target, edge: "top" },
+      ops: relinkOps(state, rows, cardId, rows.slots.indexOf(x)),
+      row: x.row,
+    }));
+  const cur = base.slots[base.current];
+  let slots: CardSlot[];
+  if (base.mode === "row") {
+    // rows above, this row's stack, rows below
+    const above = rowSlots.filter((x) => x.row! < curRow);
+    const below = rowSlots.filter((x) => x.row! > curRow);
+    slots = [...above, ...base.slots, ...below];
+  } else {
+    slots = [...rowSlots, ...base.slots];
+  }
+  return { ...base, slots, current: slots.indexOf(cur) };
+}
+
+interface AnswerRows {
+  speech: SpeechId;
+  /** Rows (top to bottom) with an argument directly to the left that the card can answer. */
+  slots: { row: number; target: string }[];
+  /** Index of the card's current row in `slots`, or -1. */
+  current: number;
+}
+
+function answerRows(f: FormatConfig, state: FlowState, layout: RowLayout, cardId: string): AnswerRows | null {
+  const c = state.cards.find((x) => x.id === cardId);
+  const sp = c ? speechById(f, c.ownerSpeech) : null;
+  if (!c || !sp) return null;
+  const linked = !!layout.parent.get(cardId);
+  const answerZone = c.side === state.perspective && effectiveZone(state.perspective, sp, c) === "clash";
+  if (!linked && !answerZone) return null;
+  const laneIdx = f.speeches.findIndex((s) => s.id === sp.id);
+  const slots: { row: number; target: string }[] = [];
+  layout.rows.forEach((r, i) => {
+    for (let k = laneIdx - 1; k >= 0; k--) {
+      const cell = r.cells.get(f.speeches[k].id) ?? [];
+      const t = cell.find((id) => canLink(f, state, cardId, id));
+      if (t) {
+        slots.push({ row: i, target: t });
+        return;
+      }
+      if (cell.length) return; // something else stands directly to the left
+    }
+  });
+  if (!slots.length) return null;
+  const row = linked ? layout.rowOf.get(cardId) : -1;
+  return { speech: sp.id, slots, current: slots.findIndex((x) => x.row === row) };
+}
+
+/**
+ * Dropping answer `cardId` into row slot `to`: it now answers that row's argument (its first target).
+ * Moving up (or dropping an unlinked card): real answers of this lane already there shift down a row
+ * each, until a row whose answer is only an empty slot (that slot moves into the row the card left, or is
+ * removed) or the row the card left. Moving down: the answers in between move up one row (list order).
+ */
+export function relinkOps(state: FlowState, rows: AnswerRows, cardId: string, to: number): Op[] {
+  const byId = new Map(state.cards.map((c) => [c.id, c]));
+  const occupants = (i: number) =>
+    state.cards.filter((c) => c.id !== cardId && c.ownerSpeech === rows.speech && c.respondsTo[0] === rows.slots[i].target);
+  const ops: Op[] = [];
+  const retarget = (id: string, target: string) => {
+    const c = byId.get(id)!;
+    const old = c.respondsTo[0];
+    if (old === target) return;
+    if (old) ops.push({ t: "card.unlink", id, target: old });
+    if (c.respondsTo.includes(target)) ops.push({ t: "card.unlink", id, target });
+    ops.push({ t: "card.link", id, target, first: true });
+  };
+  const from = rows.current;
+  if (from >= 0 && to > from) {
+    // moving down: the answers in between move up one row each (list order), the card lands at `to`
+    for (let i = from + 1; i <= to; i++) for (const c of occupants(i)) retarget(c.id, rows.slots[i - 1].target);
+    retarget(cardId, rows.slots[to].target);
+    return ops;
+  }
+  // moving up (or an unlinked card): the answers from `to` shift down a row each
+  let carry = [cardId];
+  for (let i = to; ; i++) {
+    if (i >= rows.slots.length) {
+      for (const id of carry) {
+        const old = byId.get(id)!.respondsTo[0];
+        if (old) ops.push({ t: "card.unlink", id, target: old });
+      }
+      break;
+    }
+    const occ = occupants(i);
+    const real = occ.filter((c) => !isBlank(c) && !carry.includes(c.id));
+    const blanks = occ.filter((c) => isBlank(c) && !carry.includes(c.id));
+    for (const id of carry) retarget(id, rows.slots[i].target);
+    if (i === from) break;
+    if (!real.length) {
+      for (const b of blanks) {
+        if (from >= 0) retarget(b.id, rows.slots[from].target);
+        else ops.push({ t: "card.delete", id: b.id });
+      }
+      break;
+    }
+    carry = real.map((c) => c.id);
+  }
+  return ops;
+}
+
+function baseCardDrag(f: FormatConfig, state: FlowState, layout: RowLayout, cardId: string): CardDrag | null {
   const byId = new Map(state.cards.map((c) => [c.id, c]));
   const c = byId.get(cardId);
   const sp = c ? speechById(f, c.ownerSpeech) : null;
@@ -109,6 +235,7 @@ export function cardDrag(f: FormatConfig, state: FlowState, layout: RowLayout, c
 }
 
 export function moveCardOps(state: FlowState, cardId: string, slot: CardSlot): Op[] {
+  if (slot.ops) return slot.ops;
   const c = state.cards.find((x) => x.id === cardId);
   if (!c) return [];
   const patch: { order: string; thesisId?: string | null } = { order: slot.order };

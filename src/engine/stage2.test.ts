@@ -30,24 +30,27 @@ function prep() {
 
 const PM_TEXT = ["Oceans are 95% unexplored", "Climate answers are in the ocean", "Cheaper per discovery", "Food security", "Space race is militarised"];
 
-/** Criteria 3–4: PMC with OC1→PM1, OC2→PM2, OC3→PM3 by Answer, OC4 by "+" then linked to PM5. */
+/**
+ * Criteria 3–4 (auto slots): every PM card gets an empty LO answer at once (OC1–OC5). OC1–OC3 and PM5's
+ * answer are filled; PM4's slot stays empty, so PM4 is unanswered. `blank4` = that empty slot.
+ */
 function pmc() {
   const ctx = prep();
   const { s } = ctx;
   s.go("PMC");
   const pm = PM_TEXT.map((t) => s.card("PMC", t));
+  const blanks = pm.map((id) => s.state.cards.find((c) => c.respondsTo[0] === id)!.id);
   const oc1 = s.answer(pm[0], "Unexplored is not more valuable");
   const oc2 = s.answer(pm[1], "Satellites already watch the ocean");
   const oc3 = s.answer(pm[2], "Ignores spin-offs");
-  const oc4 = s.card("LOC", "Treaties limit militarisation", { zone: "clash" });
-  return { ...ctx, pm, oc: [oc1, oc2, oc3, oc4] };
+  const oc4 = s.answer(pm[4], "Treaties limit militarisation");
+  return { ...ctx, pm, oc: [oc1, oc2, oc3, oc4], blank4: blanks[3], blanks };
 }
 
-/** Criterion 7: through LOC (said as in stage 1), MG answers OA1, MG2 new, OC5 → MG1, OC6 → PM4. */
+/** Criterion 7: through LOC (said as in stage 1), MG answers OA1, MG2 new, OC5 → MG1, PM4's slot moves to MO. */
 function mgmo() {
   const ctx = pmc();
   const { s, pm, oc, a1, a3, a5 } = ctx;
-  s.link(oc[3], pm[4]);
   s.go("LOC");
   for (const id of [a1, a3, a5, ...oc]) s.say(id);
   s.go("MG");
@@ -84,8 +87,8 @@ describe("answer links", () => {
   });
 
   it("Link toggles targets of the other side from earlier speeches only; unlink; delete cleans up", () => {
-    const { s, pm, oc, a1 } = pmc();
-    const oc4 = oc[3];
+    const { s, pm, a1 } = pmc();
+    const oc4 = s.card("LOC", "Treaties limit militarisation", { zone: "clash" }); // "+": unlinked
     expect(s.card$(oc4).respondsTo).toEqual([]);
     expect(clash.linkTargets(APDA, s.state, oc4)).toEqual(new Set(pm));
     s.link(oc4, pm[4]);
@@ -99,9 +102,11 @@ describe("answer links", () => {
     expect(s.card$(oc4).respondsTo).toEqual([pm[4], pm[1]]);
     s.run(clash.unlinkCard(s.state, oc4, pm[1]));
     expect(s.card$(oc4).respondsTo).toEqual([pm[4]]);
-    // deleting a target removes it from every respondsTo
+    // deleting a target removes it from every respondsTo; an empty slot that only answered it goes too
+    const slot5 = s.state.cards.filter((c) => c.respondsTo[0] === pm[4] && c.id !== oc4);
     s.run(cmd.deleteCard(s.state, pm[4]));
     expect(s.card$(oc4).respondsTo).toEqual([]);
+    expect(slot5.filter((c) => s.state.cards.some((x) => x.id === c.id && !x.text))).toEqual([]);
   });
 
   it("Enter on an answer creates the next answer, unlinked", () => {
@@ -113,36 +118,40 @@ describe("answer links", () => {
 });
 
 describe("rows (layoutRows)", () => {
-  it("answers sit in their target's row; unlinked cards start new rows; gaps stay empty", () => {
-    const { s, pm, oc } = pmc();
+  it("answers sit in their target's row; an empty slot holds PM4's; unlinked cards start new rows", () => {
+    const { s, pm, oc, blank4 } = pmc();
     const L = s.rows();
-    // PM rows come first (PMC is the first lane), each with its answer beside it
     for (let i = 0; i < 3; i++) expect(L.rowOf.get(oc[i])).toBe(L.rowOf.get(pm[i]));
-    // PM4 and PM5 rows have nothing in LO's lane (OC4 is unlinked → its own row after the PM rows)
-    expect(L.rows[L.rowOf.get(pm[3])!].cells.get("LOC")).toBeUndefined();
-    expect(L.rowOf.get(oc[3])).toBeGreaterThan(L.rowOf.get(pm[4])!);
-    expect(s.col("LOC").slice(0, 4)).toEqual(["OC1", "OC2", "OC3", "OC4"]);
-    // linking OC4 to PM5 moves it into PM5's row
-    s.link(oc[3], pm[4]);
-    expect(s.row(oc[3])).toBe(s.row(pm[4]));
-    expect(s.rows().rows[s.row(pm[3])].cells.get("LOC")).toBeUndefined();
+    expect(L.rowOf.get(oc[3])).toBe(L.rowOf.get(pm[4]));
+    // PM4's row holds only its empty answer slot (with its arrow); PM4 stays unanswered
+    expect(L.rows[L.rowOf.get(pm[3])!].cells.get("LOC")).toEqual([blank4]);
+    expect(s.board().cards.get(pm[3])!.unanswered).toBe(true);
+    expect(s.board().links.find((l) => l.from === blank4)).toMatchObject({ to: pm[3], blank: true, kind: "answer" });
+    // numbers follow the rows: the slots are OC1–OC5 in PM order
+    expect(s.col("LOC").slice(0, 5)).toEqual(["OC1", "OC2", "OC3", "OC4", "OC5"]);
+    expect(s.label(blank4)).toBe("OC4");
+    // a card made with "+" is unlinked: its own row below the PM rows
+    const x = s.card("LOC", "Extra", { zone: "clash" });
+    expect(s.row(x)).toBeGreaterThan(s.row(pm[4]));
   });
 
   it("chains stay in one row: OA1 ← MG1 ← OC5; a skip-lane answer sits in PM4's row; MG2 is a new row", () => {
-    const { s, a1, mg1, mg2, oc5, oc6, pm } = mgmo();
+    const { s, a1, mg1, mg2, oc5, oc6, pm, blank4 } = mgmo();
+    const ctx2 = (_s: unknown, _t: string) => blank4;
     expect(s.row(mg1)).toBe(s.row(a1));
     expect(s.row(oc5)).toBe(s.row(a1));
     expect(s.row(oc6)).toBe(s.row(pm[3]));
     const L = s.rows();
     expect(L.rows[s.row(mg2)].key).toBe(mg2);
     expect(L.rows[s.row(mg2)].origin).toBe("MG");
-    // the PM4 row has nothing in LO's or MG's lane: the arrow goes straight across
+    // PM4's empty slot moved from LO to MO at LOC → MG and was filled there: the arrow goes straight across
     expect(L.rows[s.row(pm[3])].cells.get("LOC")).toBeUndefined();
     expect(L.rows[s.row(pm[3])].cells.get("MG")).toBeUndefined();
+    expect(oc6).toBe(ctx2(s, pm[3]));
   });
 
   it("carried cards keep the row they had in LO", () => {
-    const { s, a2, a4, a6, a1, a3 } = pmc();
+    const { s, a2, a4, a6, a1, a3, blank4 } = pmc();
     s.go("LOC");
     const before = [a1, a2, a3, a4].map((id) => s.row(id));
     expect(before.map((r) => r - before[0])).toEqual([0, 1, 2, 3]);
@@ -154,9 +163,14 @@ describe("rows (layoutRows)", () => {
     expect(after.map((r) => r - after[0])).toEqual([0, 1, 2, 3]);
     expect(s.rows().rows[s.row(a2)].cells.get("LOC")).toBeUndefined();
     expect(s.rows().rows[s.row(a2)].cells.get("MO")).toEqual([a2]);
-    // unsaid answers carried along stay beside their PM targets
-    expect(s.col("MO").slice(0, 5)).toEqual(["OC1", "OC2", "OC3", "OC4", "OA2"]);
+    // unsaid answers carried along stay beside their PM targets; PM4's empty slot moved on unlocked (OC5)
+    expect(s.col("MO").slice(0, 6)).toEqual(["OC1", "OC2", "OC3", "OC5", "OC4", "OA2"]);
     expect(a6).toBeTruthy();
+    expect(s.card$(blank4)).toMatchObject({ ownerSpeech: "MO", carriedFrom: "LOC", numberLocked: false });
+    expect(s.board().cards.get(blank4)!.fromLabel).toBeNull();
+    // going back returns it
+    s.go("LOC");
+    expect(s.card$(blank4).ownerSpeech).toBe("LOC");
   });
 
   it("two targets: the card stays in its first target's row; the extra target only adds an arrow", () => {
@@ -178,22 +192,28 @@ describe("rows (layoutRows)", () => {
 
   it("live columns renumber when rows reorder; locked numbers never change", () => {
     const { s, pm, oc } = pmc();
-    // OC4 (unlinked, below the PM rows) linked to PM1 jumps into PM1's row → it becomes OC2
-    s.link(oc[3], pm[0]);
-    expect([oc[0], oc[3], oc[1], oc[2]].map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC4"]);
-    s.run(clash.unlinkCard(s.state, oc[3], pm[0]));
-    expect(oc.map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC4"]);
+    // a "+" card (unlinked, below the PM rows) linked to PM1 jumps into PM1's row → it becomes OC2
+    const x = s.card("LOC", "Extra", { zone: "clash" });
+    expect(s.label(x)).toBe("OC6");
+    s.link(x, pm[0]);
+    expect([oc[0], x, oc[1], oc[2]].map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC4"]);
+    s.run(clash.unlinkCard(s.state, x, pm[0]));
+    expect(oc.map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC5"]);
     // lock LO (LOC → MG), then reorder rows: locked labels stay
+    for (const id of oc) s.say(id);
     s.go("LOC");
     s.go("MG");
-    s.link(oc[3], pm[0]);
-    expect(oc.map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC4"]);
+    const before = oc.map((id) => s.label(id));
+    s.link(x, pm[0]);
+    expect(oc.map((id) => s.label(id))).toEqual(before);
   });
 
-  it("MO numbers answers MG first, then what is left from PM (OC5 → MG1, OC6 → PM4)", () => {
-    const { s, oc5, oc6 } = mgmo();
+  it("MO numbers answers MG first (MG1, MG2's slot), then what is left from PM (PM4)", () => {
+    const { s, oc5, oc6, mg2 } = mgmo();
     expect(s.label(oc5)).toBe("OC5");
-    expect(s.label(oc6)).toBe("OC6");
+    const mg2slot = s.state.cards.find((c) => c.respondsTo[0] === mg2)!.id;
+    expect(s.label(mg2slot)).toBe("OC6");
+    expect(s.label(oc6)).toBe("OC7");
     // on screen OC6 (PM4's row) is above OC5 (OA1's row)
     expect(s.row(oc6)).toBeLessThan(s.row(oc5));
   });
@@ -208,7 +228,7 @@ describe("rows (layoutRows)", () => {
   });
 
   it("lanes: own region with labels, thesis segments, add buttons and gaps like stage 1", () => {
-    const { s, t1, t2, t3, a1, a2, a6, oc } = pmc();
+    const { s, t1, t2, t3, a1, a2, a6 } = pmc();
     const lo = s.rows().lanes.get("LOC")!;
     expect(lo.labels.map((l) => l.zone)).toEqual(["clash", "own"]);
     expect(lo.segments.map((g) => g.thesisId)).toEqual([t1, t2, t3]);
@@ -216,8 +236,8 @@ describe("rows (layoutRows)", () => {
     // live: an add button for the clash group and each thesis; the footer after the last thesis
     expect(lo.adds.map((a) => a.group.thesisId)).toEqual([null, t1, t2, t3]);
     expect(lo.footer).toBe(s.row(a6));
-    // gaps exist only between cards of the own region: OC4 (unlinked) and the OA cards
-    expect(lo.gaps.map((g) => g.cardId)).toEqual([oc[3], a1, a2, ...lo.gaps.slice(3).map((g) => g.cardId)]);
+    // gaps exist only between cards of the own region (every response here is linked): the OA cards
+    expect(lo.gaps.map((g) => g.cardId).slice(0, 2)).toEqual([a1, a2]);
     expect(lo.gaps.find((g) => g.cardId === a2)!.prevId).toBe(a1);
     // an empty live thesis gets a placeholder row with its header and add button
     const t4 = s.thesis("Empty thesis", t3);
@@ -231,7 +251,6 @@ describe("rows (layoutRows)", () => {
 describe("answered status, counters, unanswered list", () => {
   it("criterion 4: PM4 unanswered, LO counter 'PM answered 4/5', the list holds PM4", () => {
     const { s, pm, oc } = pmc();
-    s.link(oc[3], pm[4]);
     const b = s.board();
     expect(b.cards.get(pm[3])!.unanswered).toBe(true);
     expect(b.cards.get(pm[3])!.tone).toBe("unanswered");
@@ -318,8 +337,10 @@ describe("Government mirror", () => {
     expect(b.cards.get(lo1)!.unanswered).toBe(true);
     expect(b.columns.find((c) => c.speech.id === "MG")!.answerCounter!.map((p) => p.text)).toEqual(["LO answered 1/2"]);
     s.go("PMR");
+    // LO1's empty slot moved from MG to PMR at MG → MO (long arrow); answering fills it
     const gr1 = s.answer(lo1, "Long term is speculative");
-    expect(s.label(gr1)).toBe("GR1");
+    expect(s.card$(gr1).ownerSpeech).toBe("PMR");
+    expect(s.label(gr1)).toMatch(/^GR\d$/);
     expect(s.board().cards.get(lo1)!.unanswered).toBe(false);
   });
 });
@@ -337,7 +358,11 @@ describe("another format through config only", () => {
     const b = s.board();
     expect(b.columns.find((c) => c.speech.id === "NORTH")!.answerCounter!.map((p) => p.text)).toEqual(["SO answered 1/2"]);
     expect(b.unanswered.map((v) => v.card.id)).toEqual([so2]);
-    expect(b.links).toEqual([{ from: q1, to: so1, tone: "ours" }]);
+    const so2slot = s.state.cards.find((c) => c.respondsTo[0] === so2)!.id;
+    expect(b.links).toEqual([
+      { from: q1, to: so1, tone: "ours", kind: "answer", blank: false },
+      { from: so2slot, to: so2, tone: "ours", kind: "answer", blank: true },
+    ]);
   });
 });
 
@@ -407,16 +432,43 @@ describe("drag moves", () => {
     expect([a1, a3, a5].map((id) => s.label(id))).toEqual(["OA1", "OA3", "OA5"]);
   });
 
-  it("a linked answer moves only inside its row's stack", () => {
-    const { s, pm, oc } = pmc();
+  it("a linked answer reorders inside its row's stack, or moves to another row and answers what is left of it", () => {
+    const { s, pm, oc, blank4 } = pmc();
     const extra = s.answer(pm[0], "Second answer to PM1");
-    const d = cardDrag(APDA, s.state, s.rows(), extra)!;
+    let d = cardDrag(APDA, s.state, s.rows(), extra)!;
     expect(d.mode).toBe("row");
-    expect(d.slots.map((x) => x.before)).toEqual([oc[0], null]);
-    s.run({ ops: moveCardOps(s.state, extra, d.slots[0]) });
+    const stack = d.slots.filter((x) => !x.ops);
+    expect(stack.map((x) => x.before)).toEqual([oc[0], null]);
+    s.run({ ops: moveCardOps(s.state, extra, stack[0]) });
     expect(s.rows().rows[s.row(pm[0])].cells.get("LOC")).toEqual([extra, oc[0]]);
     expect(s.label(extra)).toBe("OC1");
-    expect(stepSlot(0, d.slots.length, -1)).toBeNull();
+    const rowSlot = (id: string, target: string) => {
+      const dd = cardDrag(APDA, s.state, s.rows(), id)!;
+      return dd.slots.find((x) => x.anchor && "cardId" in x.anchor && x.anchor.cardId === target)!;
+    };
+    // moved up onto PM2's row: it answers PM2; OC2 shifts down to PM3, OC3 to PM4, whose empty slot moves
+    // into the row the card left (PM5)
+    s.run({ ops: moveCardOps(s.state, oc[3], rowSlot(oc[3], pm[1])) });
+    expect([oc[3], oc[1], oc[2], blank4].map((id) => s.card$(id).respondsTo[0])).toEqual([pm[1], pm[2], pm[3], pm[4]]);
+    // moved down (PM2 → PM4): the answers in between move up one row
+    s.run({ ops: moveCardOps(s.state, oc[3], rowSlot(oc[3], pm[3])) });
+    expect([oc[1], oc[2], oc[3]].map((id) => s.card$(id).respondsTo[0])).toEqual([pm[1], pm[2], pm[3]]);
+    expect(s.card$(oc[0]).respondsTo[0]).toBe(pm[0]);
+    expect(s.card$(extra).respondsTo[0]).toBe(pm[0]);
+    // keyboard: Alt+↓ steps one slot at a time (stack, then the next rows)
+    d = cardDrag(APDA, s.state, s.rows(), blank4)!;
+    expect(stepSlot(d.current, d.slots.length, 1)).toBeNull(); // PM5 is the last row
+  });
+
+  it("an unlinked response dropped on a row answers that row's argument; the empty slot there goes", () => {
+    const { s, pm, blank4 } = pmc();
+    const x = s.card("LOC", "Treaties limit militarisation", { zone: "clash" });
+    const d = cardDrag(APDA, s.state, s.rows(), x)!;
+    const toPm4 = d.slots.find((y) => y.anchor && "cardId" in y.anchor && y.anchor.cardId === pm[3])!;
+    s.run({ ops: moveCardOps(s.state, x, toPm4) });
+    expect(s.card$(x).respondsTo).toEqual([pm[3]]);
+    expect(s.state.cards.some((c) => c.id === blank4)).toBe(false);
+    expect(s.board().cards.get(pm[3])!.unanswered).toBe(false);
   });
 
   it("theses reorder with their cards; points move inside and between cards", () => {
@@ -463,5 +515,58 @@ describe("sync: respondsTo is a Y.Array", () => {
     applyOpsToDoc(a, "opp", [{ t: "card.link", id: oc[0], target: pm[1] }]);
     expect(cardsMap(a, "opp").get(oc[0])!.get("respondsTo")).toBeInstanceOf(Y.Array);
     expect(readSnapshot(a).flow.cards.find((c) => c.id === oc[0])!.respondsTo).toEqual([pm[0], pm[1]]);
+  });
+});
+
+describe("automatic answer slots and rebuttal extensions (feedback 18.11)", () => {
+  it("a new PM card gets an empty LO answer slot at once; R reuses it; Enter on PM1 makes PM2 with its slot", () => {
+    const s = new Sim(APDA, "opp");
+    s.go("PMC");
+    const pm1 = s.card("PMC", "");
+    const slot = s.state.cards.find((c) => c.respondsTo[0] === pm1)!;
+    expect(slot).toMatchObject({ ownerSpeech: "LOC", zone: "clash", text: "" });
+    expect(s.label(slot.id)).toBe("OC1");
+    expect(s.board().links).toEqual([{ from: slot.id, to: pm1, tone: "ours", kind: "answer", blank: true }]);
+    expect(s.board().cards.get(pm1)!.unanswered).toBe(true); // an empty slot is not an answer
+    expect(s.answer(pm1)).toBe(slot.id);
+    const r = s.run(cmd.createCardBelow(APDA, s.state, pm1, s.newId));
+    const pm2 = (r.focus as { id: string }).id;
+    expect(s.state.cards.filter((c) => c.respondsTo[0] === pm2)).toHaveLength(1);
+    // deleting PM2 removes its empty slot
+    s.run(cmd.deleteCard(s.state, pm2));
+    expect(s.col("LOC")).toEqual(["OC1"]);
+  });
+
+  it("LOR is open during MO: every argument made in a constructive gets an extension slot in its row", () => {
+    const { s, a1, mg1, oc5, a2 } = mgmo();
+    expect(s.state.cards.filter((c) => c.ownerSpeech === "LOR")).toHaveLength(0); // not open in MG
+    s.go("MO");
+    const ext = (id: string) => s.state.cards.find((c) => c.ownerSpeech === "LOR" && c.respondsTo[0] === id);
+    expect(ext(a1)).toBeTruthy();
+    expect(s.row(ext(a1)!.id)).toBe(s.row(a1));
+    expect(ext(oc5)).toBeUndefined();
+    s.say(oc5); // made during MO: its extension appears at once, in the same row as OA1's
+    expect(s.row(ext(oc5)!.id)).toBe(s.row(a1));
+    expect(s.rows().rows[s.row(a1)].cells.get("LOR")).toEqual([ext(a1)!.id, ext(oc5)!.id]); // stacked, top-aligned
+    const link = s.board().links.find((l) => l.from === ext(oc5)!.id)!;
+    expect(link).toMatchObject({ to: oc5, kind: "extend", blank: true });
+    s.say(oc5); // un-made: its empty extension goes
+    expect(ext(oc5)).toBeUndefined();
+    s.say(a2);
+    expect(ext(a2)).toBeTruthy();
+    expect(mg1).toBeTruthy();
+    // going back to MG closes LOR: empty extensions go
+    s.go("MG");
+    expect(s.state.cards.filter((c) => c.ownerSpeech === "LOR")).toHaveLength(0);
+  });
+
+  it("empty slots of unanswered arguments move on at the end of MO (to LOR)", () => {
+    const { s, mg2 } = mgmo();
+    s.go("MO");
+    const slot = s.state.cards.find((c) => c.respondsTo[0] === mg2)!;
+    expect(slot.ownerSpeech).toBe("MO");
+    s.go("LOR");
+    expect(s.card$(slot.id)).toMatchObject({ ownerSpeech: "LOR", series: "R", carriedFrom: "MO" });
+    expect(s.row(slot.id)).toBe(s.row(mg2));
   });
 });

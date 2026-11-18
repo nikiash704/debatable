@@ -206,19 +206,7 @@ export function useBoardDrag(c: Controller, session: RoomSession, toast: (m: str
           return { y: y ?? rectY(p.el, "top") ?? 0, ops: moveCardOps(state, w.cardId, s), key: s.key };
         });
         current = d.current;
-        if (d.mode === "row") {
-          const stack = layout.rows[d.row]?.cells.get(d.speech) ?? [];
-          const rects = stack.map((id) => cardEl(id)?.getBoundingClientRect()).filter(Boolean) as DOMRect[];
-          const lr = laneEl?.getBoundingClientRect();
-          if (rects.length && lr) {
-            band = {
-              top: contentY(Math.min(...rects.map((r) => r.top))),
-              bottom: contentY(Math.max(...rects.map((r) => r.bottom))),
-              left: contentX(lr.left),
-              right: contentX(lr.right),
-            };
-          }
-        }
+        // a linked answer is no longer limited to its row: other rows re-link it (engine: relinkOps)
       } else if (w.kind === "thesis") {
         const d = thesisDrag(state, w.thesisId);
         if (!d) return;

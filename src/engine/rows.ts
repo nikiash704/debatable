@@ -126,7 +126,8 @@ export function layoutRows(f: FormatConfig, state: FlowState): RowLayout {
     let p: string | null = null;
     for (const t of c.respondsTo) {
       const tc = byId.get(t);
-      if (tc && tc.id !== c.id && tc.side !== c.side && lane(tc.ownerSpeech) < lane(c.ownerSpeech)) {
+      const sideOk = tc && (tc.side !== c.side || !speeches.get(c.ownerSpeech)!.allowsNew); // rebuttal extensions
+      if (tc && sideOk && tc.id !== c.id && lane(tc.ownerSpeech) < lane(c.ownerSpeech)) {
         p = tc.id;
         break;
       }

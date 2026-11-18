@@ -30,7 +30,7 @@ export class Sim {
   }
 
   go(stage: string) {
-    this.state = applyOps(this.state, planStageChange(this.f, this.state, stage));
+    this.state = applyOps(this.state, planStageChange(this.f, this.state, stage, this.newId));
   }
 
   thesis(title: string, after: string | null = null): string {
@@ -56,7 +56,7 @@ export class Sim {
   }
 
   say(id: string) {
-    this.run(cmd.toggleSaid(this.f, this.state, id));
+    this.run(cmd.toggleSaid(this.f, this.state, id, this.newId));
   }
 
   tag(id: string, type: TagType, ref?: string) {

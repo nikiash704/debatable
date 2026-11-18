@@ -9,7 +9,7 @@ import type { Identity, Peer, SyncStatus } from "../sync/session";
 import { startNewRound } from "./App";
 import copyIcon from "./icons/copy.svg";
 import { StageStepper } from "./components/StageStepper";
-import type { Controller } from "./controller";
+import { SPEECH_MODE, type Controller } from "./controller";
 import { MOD } from "./keys";
 import { inviteLink, navigate, roomPath } from "./router";
 
@@ -349,7 +349,7 @@ export function StageBar({ c, timer }: { c: Controller; timer?: React.ReactNode 
       <span className="stagebar__spacer" />
       {timer}
       <UnansweredPill c={c} />
-      {c.canSpeechMode && (
+      {c.canSpeechMode && SPEECH_MODE && (
         <button
           type="button"
           className="speech-toggle"

@@ -10,8 +10,8 @@ export type Op =
   | { t: "card.create"; card: Card }
   | { t: "card.update"; id: string; patch: CardPatch }
   | { t: "card.delete"; id: string }
-  /** Adds a target to the end of a card's respondsTo (no duplicates). */
-  | { t: "card.link"; id: string; target: string }
+  /** Adds a target to the end (or, with `first`, the start) of a card's respondsTo (no duplicates). */
+  | { t: "card.link"; id: string; target: string; first?: boolean }
   /** Removes a target from a card's respondsTo. */
   | { t: "card.unlink"; id: string; target: string }
   | { t: "point.insert"; cardId: string; index: number; point: Point }
@@ -39,7 +39,9 @@ function applyOp(s: FlowState, op: Op): FlowState {
     case "card.link":
       return {
         ...s,
-        cards: s.cards.map((c) => (c.id === op.id && !c.respondsTo.includes(op.target) ? { ...c, respondsTo: [...c.respondsTo, op.target] } : c)),
+        cards: s.cards.map((c) =>
+          c.id === op.id && !c.respondsTo.includes(op.target) ? { ...c, respondsTo: op.first ? [op.target, ...c.respondsTo] : [...c.respondsTo, op.target] } : c,
+        ),
       };
     case "card.unlink":
       return {

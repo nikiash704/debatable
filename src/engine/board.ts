@@ -1,4 +1,5 @@
 import type { FormatConfig, SpeechConfig, StageId } from "../config/types";
+import { isBlank } from "./auto";
 import { answerStatus, answersTo, laneCounter, targetsOf, unansweredCards, type AnswerStatus, type CounterPart } from "./clash";
 import { byOrder } from "./order";
 import { computeNumbers, thesesOf } from "./numbering";
@@ -45,6 +46,8 @@ export interface CardVM {
   answeredBy: string[];
   /** Sits in its first target's row (not a row starter). */
   linked: boolean;
+  /** Empty placeholder (automatic answer / extension slot). */
+  blank: boolean;
   /** Look: ours (green border), said (green tint), neutral (answered), unanswered (red), red (new — don't say). */
   tone: "ours" | "said" | "neutral" | "unanswered" | "red";
 }
@@ -55,6 +58,10 @@ export interface LinkVM {
   to: string;
   /** Colour follows the answer card's status. */
   tone: "ours" | "neutral" | "red";
+  /** answer = the line points at the argument answered; extend = our rebuttal point, drawn argument → point. */
+  kind: "answer" | "extend";
+  /** The answer card is an empty slot (dashed line). */
+  blank: boolean;
 }
 
 export interface GroupVM {
@@ -137,7 +144,8 @@ export function computeBoard(f: FormatConfig, state: FlowState, opts: { numbers?
     const constructive = owner ? owner.allowsNew : true;
     const said = speechById(f, c.saidIn);
     const st = ours ? null : (status.get(c.id) ?? null);
-    const red = ourRebuttal && ours && constructive && !c.saidIn;
+    const blank = isBlank(c);
+    const red = ourRebuttal && ours && constructive && !c.saidIn && !blank;
     const saidGreen = ourRebuttal && ours && !!said && said.allowsNew;
     const v: CardVM = {
       card: c,
@@ -147,7 +155,8 @@ export function computeBoard(f: FormatConfig, state: FlowState, opts: { numbers?
       ours,
       struck: !!c.saidIn && (strikes || c.saidIn === stage),
       red,
-      fromLabel: c.carriedFrom ? `from ${speakerOf(f, c.carriedFrom) ?? c.carriedFrom}` : null,
+      fromLabel: c.carriedFrom && !blank ? `from ${speakerOf(f, c.carriedFrom) ?? c.carriedFrom}` : null,
+      blank,
       status: st,
       unanswered: st === "unanswered",
       saidGreen,
@@ -197,7 +206,7 @@ export function computeBoard(f: FormatConfig, state: FlowState, opts: { numbers?
       ours,
       state: st,
       current,
-      counter: current && ours ? { said: inCol.filter((c) => !!c.saidIn).length, total: inCol.length } : null,
+      counter: current && ours ? { said: inCol.filter((c) => !!c.saidIn && !isBlank(c)).length, total: inCol.filter((c) => !isBlank(c)).length } : null,
       answerCounter: laneCounter(f, state, sp.id, status),
       lane,
       zones,
@@ -210,7 +219,11 @@ export function computeBoard(f: FormatConfig, state: FlowState, opts: { numbers?
   const links: LinkVM[] = [];
   for (const v of cards.values()) {
     const tone = v.tone === "red" || v.tone === "unanswered" ? "red" : v.ours ? "ours" : "neutral";
-    for (const t of v.targets) if (cards.has(t)) links.push({ from: v.card.id, to: t, tone });
+    for (const t of v.targets) {
+      const tv = cards.get(t);
+      if (!tv) continue;
+      links.push({ from: v.card.id, to: t, tone, kind: tv.card.side === v.card.side ? "extend" : "answer", blank: v.blank });
+    }
   }
 
   const steps: StepVM[] = stagesOf(f).map((s) => ({

@@ -86,10 +86,12 @@ export function ArrowLayer({ c, gridRef }: { c: Controller; gridRef: RefObject<H
       const bt = boxIn(t, grid);
       // the answer is to the right of its target (later lane); fall back to facing edges otherwise
       const leftward = ba.x >= bt.x + bt.w || ba.x > bt.x;
-      const x1 = leftward ? ba.x : ba.x + ba.w;
-      const x2 = leftward ? bt.x + bt.w : bt.x;
-      const y1 = anchorY(a, ba);
-      const y2 = anchorY(t, bt);
+      let x1 = leftward ? ba.x : ba.x + ba.w;
+      let x2 = leftward ? bt.x + bt.w : bt.x;
+      let y1 = anchorY(a, ba);
+      let y2 = anchorY(t, bt);
+      // a rebuttal point extends our argument: the line goes argument (dot) → rebuttal point (arrowhead)
+      if (g.dataset.kind === "extend") [x1, y1, x2, y2] = [x2, y2, x1, y1];
       const dx = x2 - x1;
       const dy = y2 - y1;
       const len = Math.hypot(dx, dy) || 1;
@@ -192,7 +194,9 @@ export function ArrowLayer({ c, gridRef }: { c: Controller; gridRef: RefObject<H
               data-from={l.from}
               data-to={l.to}
               data-testid={`arrow-${label(l.from)}-${label(l.to)}`}
-              className={`arrow arrow--${l.tone}${on ? " arrow--on" : ""}`}
+              data-kind={l.kind}
+              data-blank={l.blank ? "true" : "false"}
+              className={`arrow arrow--${l.tone}${l.blank ? " arrow--blank" : ""}${on ? " arrow--on" : ""}`}
             >
               <line className="arrow__line" />
               <polyline className="arrow__head" />

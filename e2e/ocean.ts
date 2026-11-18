@@ -88,7 +88,11 @@ export async function prepInDoc(page: Page) {
   await k.press("Escape");
 }
 
-/** PMC: PM1–PM5; OC1–OC3 by Answer (R); OC4 with "+" then Link (L) to PM5. */
+/**
+ * PMC: PM1–PM5. Every PM card gets an empty LO answer slot at once (OC1–OC5, with arrows).
+ * OC1–OC3 are filled by Answer (R on the PM card), OC5 by typing into PM5's slot; PM4's slot (OC4)
+ * stays empty, so PM4 is unanswered.
+ */
 export async function pmcWithAnswers(page: Page) {
   await page.getByTestId("stage-next").click();
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "PMC");
@@ -98,17 +102,15 @@ export async function pmcWithAnswers(page: Page) {
     await page.keyboard.type(t);
   }
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  expect(await laneLabels(page, "LOC")).toEqual(["OC1", "OC2", "OC3", "OC4", "OC5", "OA1", "OA2", "OA3", "OA4", "OA5", "OA6"]);
   for (let i = 0; i < 3; i++) {
     await card(page, `PM${i + 1}`).click();
     await page.keyboard.press("r");
     await typeAndEscape(page, OC[i]);
+    await page.keyboard.press("Escape");
   }
-  await page.getByTestId("add-LOC-clash").click();
+  await card(page, "OC5").dblclick();
   await typeAndEscape(page, OC[3]);
-  // a card made with "+" in a clash zone starts unlinked: a quiet hint while it is selected
-  await expect(card(page, "OC4").getByTestId("no-target-hint")).toHaveText(/no target · L/);
-  await page.keyboard.press("l");
-  await expect(page.getByTestId("pick-banner")).toBeVisible();
-  await card(page, "PM5").click();
   await page.keyboard.press("Escape");
 }

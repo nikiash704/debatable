@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import type { CardVM, ColumnVM, GroupKey, Segment } from "../engine";
+import { linkTargets, type CardVM, type ColumnVM, type GroupKey, type Segment } from "../engine";
 import { effectiveZone, sideOf } from "../engine/stages";
 import type { Focus } from "../engine/commands";
 import { getCardText, getPointText, getThesisTitle } from "../sync/doc";
@@ -43,14 +43,7 @@ function useFocusInfo(c: Controller): FocusInfo {
   return useMemo(() => {
     if (pick) {
       const src = b.cards.get(pick.cardId);
-      const eligible = new Set<string>();
-      if (src) {
-        const si = c.f.speeches.findIndex((s) => s.id === src.card.ownerSpeech);
-        for (const v of b.cards.values()) {
-          const ti = c.f.speeches.findIndex((s) => s.id === v.card.ownerSpeech);
-          if (v.card.id !== src.card.id && v.card.side !== src.card.side && ti >= 0 && ti < si) eligible.add(v.card.id);
-        }
-      }
+      const eligible = src ? linkTargets(c.f, c.flow, src.card.id) : new Set<string>();
       return { source: pick.cardId, ring: new Set(), dimLanes: new Set(), pick: { source: pick.cardId, eligible, picked: new Set(src?.targets ?? []), cursor: pick.cursor } };
     }
     const vm = sel ? b.cards.get(sel) : null;
@@ -506,6 +499,14 @@ function CardItem({ vm, col, c, session, peers, focus, drag }: { vm: CardVM; col
         tools={!inSpeech && !c.ui.editing && !pick ? tools : undefined}
         responding={vm.targets.map((t, i) => ({ label: vm.targetLabels[i], tone: c.board.cards.get(t)?.tone ?? "neutral" }))}
         meta={vm.saidMeta}
+        blank={vm.blank}
+        respondingVerb={vm.targets.length && c.board.cards.get(vm.targets[0])?.card.side === card.side ? "Extends" : "Responding to"}
+        placeholder={vm.blank && vm.targets.length ? (c.board.cards.get(vm.targets[0])?.ours ? "Rebuttal point…" : "Answer…") : undefined}
+        made={
+          vm.ours && !vm.blank
+            ? { on: !!card.saidIn, onClick: () => c.said(card.id), tip: card.saidIn ? "Made (said) · click to undo" : "Mark made (said in the speech)", hotkey: `M · ${MOD}↵` }
+            : null
+        }
         hint={
           showHint ? (
             <div className="card__hint" data-testid="no-target-hint">

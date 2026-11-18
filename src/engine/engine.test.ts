@@ -54,8 +54,10 @@ describe("numbering (live and locked)", () => {
     );
     expect(s.col("PMC")).toEqual(["PM1", "PM2", "PM3", "PM4", "PM5"]);
     expect(pmIds).toHaveLength(5);
-    const oc = ["Unexplored ≠ more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Treaties limit militarisation"].map((t) =>
-      s.card("LOC", t, { zone: "clash" }),
+    // every PM card got an empty answer slot in LO at once (OC1–OC5); answering fills it
+    expect(s.col("LOC").slice(0, 5)).toEqual(["OC1", "OC2", "OC3", "OC4", "OC5"]);
+    const oc = ["Unexplored ≠ more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Treaties limit militarisation"].map((t, i) =>
+      s.answer(pmIds[i], t),
     );
     expect(oc.map((id) => s.label(id))).toEqual(["OC1", "OC2", "OC3", "OC4"]);
     s.go("LOC");
@@ -63,6 +65,7 @@ describe("numbering (live and locked)", () => {
     expect(s.board().columns.find((c) => c.speech.id === "PMC")!.state).toBe("locked");
     expect(s.board().columns.find((c) => c.speech.id === "LOC")!.state).toBe("live");
     const extra = s.card("LOC", "extra", { zone: "clash", atStart: true });
+    s.link(extra, pmIds[0]); // a second answer to PM1, above OC1 in PM1's row
     expect(s.label(extra)).toBe("OC1");
     expect(s.label(oc[3])).toBe("OC5");
     s.run(cmd.deleteCard(s.state, extra));
@@ -92,10 +95,11 @@ function oceanThroughLOC() {
   const pm = ["Oceans are 95% unexplored", "Climate answers are in the ocean", "Cheaper per discovery", "Food security", "Space race is militarised"].map(
     (t) => s.card("PMC", t),
   );
-  const oc = ["Unexplored ≠ more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Treaties limit militarisation"].map((t) =>
-    s.card("LOC", t, { zone: "clash" }),
+  const oc = ["Unexplored ≠ more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Treaties limit militarisation"].map((t, i) =>
+    s.answer(pm[i], t),
   );
   s.go("LOC");
+  // PM5's answer slot stays empty: it is not counted, and moves on to MO at the end of LOC
   return { ...ctx, a2, pm, oc };
 }
 
@@ -119,7 +123,7 @@ describe("speech mode, counter and carry-over", () => {
     s.go("MG");
     for (const id of [a1, a2, a3, a4, a5, a6, ...oc]) expect(s.card$(id).numberLocked).toBe(true);
     expect(s.col("LOC")).toEqual(["OC1", "OC2", "OC3", "OC4", "OA1", "OA3", "OA5"]);
-    expect(s.col("MO")).toEqual(["OA2", "OA4", "OA6"]);
+    expect(s.col("MO")).toEqual(["OC5", "OA2", "OA4", "OA6"]); // OC5 = PM5's empty answer slot (long arrow)
     const b = s.board();
     for (const id of [a2, a4, a6]) {
       expect(b.cards.get(id)!.fromLabel).toBe("from LO");
@@ -140,7 +144,8 @@ describe("speech mode, counter and carry-over", () => {
     const mg1 = s.card("MG", "Asteroid mining is decades away");
     s.card("MG", "Earth's problems come first");
     expect(s.col("MG")).toEqual(["MG1", "MG2"]);
-    const oc5 = s.card("MO", "Decades away is still a payoff", { zone: "clash" });
+    // MG1 and MG2 got empty answer slots in MO (MG answers are numbered first): MG1's is OC5
+    const oc5 = s.answer(mg1, "Decades away is still a payoff");
     const oa7 = s.card("MO", "Space inspires STEM careers", { thesis: t1 });
     expect(s.label(oc5)).toBe("OC5");
     expect(s.label(oa7)).toBe("OA7");
@@ -162,8 +167,8 @@ describe("rebuttals", () => {
     const { s, t1, a1, a2, a3, a5, oc } = ctx;
     for (const id of [a1, a3, a5, ...oc]) s.say(id);
     s.go("MG");
-    s.card("MG", "Asteroid mining is decades away");
-    const oc5 = s.card("MO", "Decades away is still a payoff", { zone: "clash" });
+    const mg1 = s.card("MG", "Asteroid mining is decades away");
+    const oc5 = s.answer(mg1, "Decades away is still a payoff");
     const oa7 = s.card("MO", "Space inspires STEM careers", { thesis: t1 });
     s.go("MO");
     s.say(oc5);
@@ -181,11 +186,18 @@ describe("rebuttals", () => {
     for (const id of [a4, a6, oa7]) expect(b.cards.get(id)!.red).toBe(true);
     for (const id of [a1, a2, oc5]) expect(b.cards.get(id)!.red).toBe(false);
     expect(b.pooAvailable).toBe(true);
+    // LOR already holds an empty extension slot in the row of every argument made in LOC / MO
+    const ext = (id: string) => s.state.cards.find((c) => c.ownerSpeech === "LOR" && c.respondsTo[0] === id);
+    for (const id of [a1, a2, oc5]) expect(s.row(ext(id)!.id)).toBe(s.row(id));
+    for (const id of [a4, a6, oa7]) expect(ext(id)).toBeUndefined();
     const r1 = s.card("LOR", "They dropped asteroid mining");
     const r2 = s.card("LOR", "Weigh: long term beats short term");
-    expect([r1, r2].map((id) => s.label(id))).toEqual(["OR1", "OR2"]);
+    const n = (id: string) => s.board().cards.get(id)!.number;
+    expect(s.label(r1)).toMatch(/^OR\d+$/);
+    expect(n(r2)).toBe(n(r1) + 1);
+    const before = n(r1);
     const r0 = s.card("LOR", "Opening crystallisation", { atStart: true });
-    expect([r0, r1, r2].map((id) => s.label(id))).toEqual(["OR1", "OR2", "OR3"]);
+    expect([r0, r1, r2].map(n)).toEqual([before, before + 1, before + 2]);
     expect(s.board().cards.get(r0)!.red).toBe(false);
     // MO's numbers locked at MO → LOR
     expect(s.card$(oc5).numberLocked).toBe(true);
@@ -312,7 +324,7 @@ describe("Government mirror", () => {
     expect(s.board().cards.get(g2)!.fromLabel).toBe("from PM");
     const lo1 = s.card("LOC", "Space pays off long term");
     expect(s.label(lo1)).toBe("LO1");
-    const gc1 = s.card("MG", "Long term is speculative", { zone: "clash" });
+    const gc1 = s.answer(lo1, "Long term is speculative"); // fills LO1's empty answer slot in MG
     expect(s.label(gc1)).toBe("GC1");
     s.go("MG");
     const ga4 = s.card("MG", "Food security", { thesis: t1 });
@@ -327,7 +339,7 @@ describe("Government mirror", () => {
     expect(s.board().cards.get(g2)!.red).toBe(false);
     s.go("PMR");
     const gr1 = s.card("PMR", "Answer to MO's new STEM point");
-    expect(s.label(gr1)).toBe("GR1");
+    expect(s.label(gr1)).toMatch(/^GR\d+$/);
     const b = s.board();
     expect(b.cards.get(gr1)!.red).toBe(false);
     expect(b.cards.get(g2)!.red).toBe(true);
@@ -378,7 +390,7 @@ describe("a different format through config only", () => {
     s.go("s1");
     const so1 = s.card("s1", "Their opener");
     expect(s.label(so1)).toBe("SO1");
-    const q1 = s.card("n1", "Answer", { zone: "clash" });
+    const q1 = s.answer(so1, "Answer");
     expect(s.label(q1)).toBe("NQ1");
     s.go("n1");
     s.say(p1);
@@ -387,14 +399,14 @@ describe("a different format through config only", () => {
     expect(s.card$(q1).ownerSpeech).toBe("n2");
     expect(s.board().cards.get(p2)!.fromLabel).toBe("from N1");
     s.go("n2");
-    expect(s.label(s.card("n2", "New answer", { zone: "clash" }))).toBe("NQ2");
+    expect(s.label(s.card("n2", "New answer", { zone: "clash" }))).toMatch(/^NQ\d+$/);
     expect(s.label(s.card("n2", "New arg", { thesis: t }))).toBe("NP3");
     s.go("n9");
     const b = s.board();
     expect(b.cards.get(p2)!.red).toBe(true);
     expect(b.cards.get(p1)!.red).toBe(false);
     expect(b.pooAvailable).toBe(true);
-    expect(s.label(s.card("n9", "Summary"))).toBe("NZ1");
+    expect(s.label(s.card("n9", "Summary"))).toBe("NZ2"); // NZ1 = the extension slot of the made NP1
     expect(b.steps.find((x) => x.state === "current")!.label).toBe("N-END");
   });
 });

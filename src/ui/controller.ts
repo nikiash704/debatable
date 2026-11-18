@@ -4,6 +4,7 @@ import {
   addPoint,
   answerCard,
   answerPlace,
+  canLink,
   cardDrag,
   computeBoard,
   computeNumbers,
@@ -63,6 +64,9 @@ export interface UiState {
 }
 
 const newId = () => randomId(12);
+
+/** Speech mode (stage 1) is hidden for now; see `speechMode` below. */
+export const SPEECH_MODE = false;
 
 /** Keyboard navigation items of a lane, top to bottom (rows), with the row each one sits in. */
 export type NavItem = { kind: "card"; id: string; row: number } | { kind: "thesis"; id: string; row: number };
@@ -220,8 +224,10 @@ export function useController(
 
   const current = board.speech;
   const canSpeechMode = !!current && current.side === flow.perspective;
-  const auto = speechModeColumn(f, flow, role) !== null;
-  const speechMode = canSpeechMode && (ui.speechOverride ?? auto);
+  // Speech mode is switched off for now (user feedback 18.11): everything works the same at every stage,
+  // and "Made" marks a card said. The code stays for later; flip SPEECH_MODE to bring it back.
+  const auto = SPEECH_MODE && speechModeColumn(f, flow, role) !== null;
+  const speechMode = SPEECH_MODE && canSpeechMode && (ui.speechOverride ?? auto);
   const speechColumn = speechMode && current ? current.id : null;
 
   const select = useCallback(
@@ -300,7 +306,7 @@ export function useController(
     [run],
   );
 
-  const said = useCallback((cardId: string) => run(toggleSaid(f, flowRef.current, cardId)), [f, run]);
+  const said = useCallback((cardId: string) => run(toggleSaid(f, flowRef.current, cardId, newId)), [f, run]);
   const strong = useCallback((cardId: string) => run(toggleStrong(flowRef.current, cardId)), [run]);
 
   const tag = useCallback(
@@ -440,7 +446,7 @@ export function useController(
 
   const goStage = useCallback(
     (stage: string) => {
-      const ops = planStageChange(f, flowRef.current, stage);
+      const ops = planStageChange(f, flowRef.current, stage, newId);
       if (ops.length) session.apply(ops);
     },
     [f, session],
@@ -450,6 +456,7 @@ export function useController(
 
   const toggleSpeechMode = useCallback(() => {
     if (!canSpeechMode) return;
+    if (!SPEECH_MODE) return;
     setUi((u) => ({ ...u, speechOverride: !(u.speechOverride ?? auto) }));
   }, [canSpeechMode, auto]);
 
@@ -468,7 +475,7 @@ export function useController(
 
   const speechTap = useCallback(
     (cardId: string) => {
-      run(toggleSaid(f, flowRef.current, cardId));
+      run(toggleSaid(f, flowRef.current, cardId, newId));
       const col = boardRef.current.columns.find((c) => c.speech.id === speechColumn);
       if (!col) return;
       const items = navItems(col, true, boardRef.current);
@@ -526,7 +533,7 @@ export function useController(
       const src = b.cards.get(p.cardId)?.card;
       if (!src) return;
       const lanes = b.columns
-        .map((col) => col.order.filter((v) => v.card.id !== src.id && v.card.side !== src.side && f.speeches.findIndex((s) => s.id === v.card.ownerSpeech) < f.speeches.findIndex((s) => s.id === src.ownerSpeech)))
+        .map((col) => col.order.filter((v) => canLink(f, flowRef.current, src.id, v.card.id)))
         .filter((l) => l.length);
       if (!lanes.length) return;
       let li = lanes.findIndex((l) => l.some((v) => v.card.id === p.cursor));

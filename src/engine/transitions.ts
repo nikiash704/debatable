@@ -1,7 +1,9 @@
 import type { FormatConfig, StageId } from "../config/types";
+import { isBlank, moveBlankAnswers, syncExtensions } from "./auto";
+import type { IdGen } from "./commands";
 import { computeNumbers } from "./numbering";
 import { applyOps, type Op } from "./ops";
-import { speechById, stageAt, stageIndex } from "./stages";
+import { columnState, speechById, stageAt, stageIndex } from "./stages";
 import type { FlowState } from "./types";
 
 /**
@@ -15,13 +17,13 @@ import type { FlowState } from "./types";
  * S's own numbers become live again). Everything else (strike-throughs cleared in rebuttals,
  * red "new — don't say", POO) is derived from the stage, so it reverts by itself.
  */
-export function planStageChange(f: FormatConfig, state: FlowState, target: StageId): Op[] {
+export function planStageChange(f: FormatConfig, state: FlowState, target: StageId, newId?: IdGen): Op[] {
   const goal = stageIndex(f, target);
   let s = state;
   const ops: Op[] = [];
   let guard = 0;
   while (stageIndex(f, s.stage) !== goal && guard++ < 100) {
-    const step = stageIndex(f, s.stage) < goal ? forwardStep(f, s) : backwardStep(f, s);
+    const step = stageIndex(f, s.stage) < goal ? forwardStep(f, s, newId) : backwardStep(f, s);
     ops.push(...step);
     s = applyOps(s, step);
   }
@@ -36,10 +38,15 @@ export function prevStage(f: FormatConfig, stage: StageId): StageId {
   return stageAt(f, stageIndex(f, stage) - 1);
 }
 
-function forwardStep(f: FormatConfig, s: FlowState): Op[] {
+function forwardStep(f: FormatConfig, s0: FlowState, newId?: IdGen): Op[] {
   const ops: Op[] = [];
-  const ending = speechById(f, s.stage);
+  const ending = speechById(f, s0.stage);
+  let s = s0;
   if (ending) {
+    // empty answer slots move on first (they are not said arguments and keep live numbers)
+    const blanks = moveBlankAnswers(f, s, ending);
+    ops.push(...blanks);
+    s = applyOps(s, blanks);
     const numbers = computeNumbers(f, s);
     for (const c of s.cards) {
       if (c.ownerSpeech === ending.id && !c.numberLocked) {
@@ -55,6 +62,7 @@ function forwardStep(f: FormatConfig, s: FlowState): Op[] {
     }
   }
   ops.push({ t: "stage.set", stage: nextStage(f, s.stage) });
+  if (newId) ops.push(...syncExtensions(f, applyOps(s0, ops), newId));
   return ops;
 }
 
@@ -72,5 +80,11 @@ function backwardStep(f: FormatConfig, s: FlowState): Op[] {
     }
   }
   ops.push({ t: "stage.set", stage: back });
+  // empty placeholders in columns that are not open any more go away (LOR extensions when back in MG)
+  const after = applyOps(s, ops);
+  for (const c of after.cards) {
+    const sp = speechById(f, c.ownerSpeech);
+    if (sp && c.side === s.perspective && isBlank(c) && columnState(f, s.perspective, sp, back) === "future") ops.push({ t: "card.delete", id: c.id });
+  }
   return ops;
 }

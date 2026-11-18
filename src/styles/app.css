@@ -2360,3 +2360,64 @@ body.dragging .tooltip,
 body.dragging .card__tools {
   display: none !important;
 }
+
+/* ---------- Feedback 18.11: auto slots, Made, extensions ---------- */
+/* empty automatic slot (answer / rebuttal point not typed yet) */
+.card--blank {
+  border-style: dashed;
+  background: transparent;
+  filter: none;
+}
+
+.card--blank .card__title--empty {
+  color: var(--c-text-faint);
+}
+
+.arrow--blank .arrow__line {
+  stroke-dasharray: 4 3;
+  opacity: 0.45;
+}
+
+.arrow--blank .arrow__head,
+.arrow--blank .arrow__dot {
+  opacity: 0.45;
+}
+
+/* "Made" (said): always visible on our cards */
+.made {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid var(--c-border-input);
+  border-radius: var(--r-badge);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.3px;
+  color: var(--c-text-tertiary);
+  background: var(--c-surface);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.made:hover {
+  border-color: var(--c-ours-line);
+  color: var(--c-ours-badge-text);
+}
+
+.made--on {
+  background: var(--c-ours-line);
+  border-color: var(--c-ours-line);
+  color: #fff;
+}
+
+.made--on:hover {
+  color: #fff;
+  opacity: 0.85;
+}
+
+@media (pointer: coarse) {
+  .made {
+    padding: 4px 8px;
+  }
+}

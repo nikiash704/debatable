@@ -199,11 +199,14 @@ export function applyOpsToDoc(doc: Y.Doc, side: SideId, ops: Op[], origin: unkno
           if (!m) break;
           const cur = m.get("respondsTo");
           if (cur instanceof Y.Array) {
-            if (!(cur.toArray() as string[]).includes(op.target)) cur.push([op.target]);
+            if (!(cur.toArray() as string[]).includes(op.target)) {
+              if (op.first) cur.insert(0, [op.target]);
+              else cur.push([op.target]);
+            }
           } else {
             // stage-1 room: plain array → Y.Array (once)
             const arr = new Y.Array<string>();
-            arr.push([...new Set([...readTargets(cur), op.target])]);
+            arr.push([...new Set(op.first ? [op.target, ...readTargets(cur)] : [...readTargets(cur), op.target])]);
             m.set("respondsTo", arr);
           }
           break;
