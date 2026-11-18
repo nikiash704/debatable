@@ -43,11 +43,12 @@ function forwardStep(f: FormatConfig, s0: FlowState, newId?: IdGen): Op[] {
   const ending = speechById(f, s0.stage);
   let s = s0;
   if (ending) {
-    // empty answer slots move on first (they are not said arguments and keep live numbers)
+    // numbers are locked as they were during the speech (the ones the speaker said); empty answer slots
+    // then move on, unlocked (they are not said arguments), leaving a gap in this column's numbers
+    const numbers = computeNumbers(f, s);
     const blanks = moveBlankAnswers(f, s, ending);
     ops.push(...blanks);
     s = applyOps(s, blanks);
-    const numbers = computeNumbers(f, s);
     for (const c of s.cards) {
       if (c.ownerSpeech === ending.id && !c.numberLocked) {
         ops.push({ t: "card.update", id: c.id, patch: { numberLocked: true, displayNumber: numbers.get(c.id) ?? null } });

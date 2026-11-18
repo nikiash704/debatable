@@ -251,6 +251,45 @@ Claude made where the brief left room. All of it can change.
     header (thesis order is per side, so every lane follows). Alt+↑/↓ = one slot, also while typing and in the
     Doc view (mouse / touch drag is on the board only).
 
+## User feedback on stage 2 (18.11.2026) — built
+
+Decided by the user (spoken from the Opposition, mirrored for the Government where it makes sense):
+1. Every opponent argument gets an answer card of ours at once, with its arrow, before anything is typed
+   (PM1 → OC1 in LO). Dragging an answer into another row makes it answer the argument directly to its left
+   there; the answers below shift down and answer the next arguments.
+2. When the round moves on and opponent arguments are still unanswered, a long arrow goes from our next
+   speech to the empty answer place (LOC → MG: from MO to PM4).
+3. Our cards have a separate, always-visible **Made** button (= said).
+4. Speech mode is removed from the main page for now; everything works the same at every stage.
+5. LOR rebuttal points sit in the rows of the arguments, not below. From MO on, every argument we made gets
+   an arrow to its rebuttal point; when two made arguments share a row, the LOR points stack at the top of
+   that row and the arrow from the right-hand argument goes diagonally down.
+
+How Claude built it (defaults, not yet confirmed):
+- The answer slots are real, empty cards (synced, numbered: PM1–PM5 → OC1–OC5). An empty card is a
+  placeholder: it is drawn with a dashed border and a dashed arrow, never counts as an answer (PM4 stays red
+  "Unanswered"), as "made", or in "said X / Y", gets no "from LO" plate, and is deleted with its only target.
+  R / "↩ Answer" types into the existing empty slot instead of making a new card. MG1 created by answering
+  our OA1 gets its own slot in MO at once.
+- At the end of our speech, empty slots of still-unanswered arguments move on to our next speech
+  (`carriesTo`, else the next speech of our side): LOC → MO, MO → LOR; Government MG → PMR. Empty slots
+  whose argument got a real answer meanwhile are deleted. Numbers are locked first, as said in the speech,
+  so the moved slot leaves a gap (LO keeps OC5 for PM5 when PM4's empty OC4 moves to MO) and takes the next
+  live number there. Going back reverses the move.
+- Rebuttal points ("extensions"): a rebuttal card may link to an earlier card of its own side. The rebuttal
+  column opens one speech earlier (config: LOR `liveFrom` MO, PMR `liveFrom` MG); while it is open, every
+  argument of ours made in a constructive gets an empty rebuttal point linked to it (created when the stage
+  opens the column and whenever Made is pressed; an empty one goes when Made is undone; all empty ones go
+  when going back closes the column). Its line runs argument (dot) → rebuttal point (arrowhead); the card
+  reads "Extends OC5". Rebuttal points the user adds with "+" are unlinked and go below, as before.
+- Drag re-link: moving an answer up (or dropping an unlinked response on a row) shifts the real answers from
+  that row down until a row whose answer is only an empty slot (that slot moves into the row the card left,
+  or is removed if the card was unlinked); moving down moves the answers in between up one row (list order).
+  Alt+↑/↓ steps through the same slots. The "Use L to change the target" snap-back is gone.
+- Made: the speech is the current one when it is ours, otherwise the card's own column, so Made works at any
+  stage. Hotkey M (also ⌘/Ctrl+Enter); Space no longer marks. The speech-mode code stays behind a flag
+  (`SPEECH_MODE` in `src/ui/controller.ts`).
+
 ## Open
 
 1. **Stylus / handwriting input**: not in stage 1; decide later.

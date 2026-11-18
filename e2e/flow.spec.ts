@@ -94,7 +94,7 @@ test("criteria 1–6 and 8: Ocean vs Space for the Opposition", async ({ page })
     }
   }
 
-  // ---------- 2. PMC: PM1–PM5, OC1–OC4; LO numbers live in PMC and LOC ----------
+  // ---------- 2. PMC: PM1–PM5, each with an empty LO answer slot; OC1–OC4 typed; LO numbers live ----------
   await page.getByTestId("stage-next").click();
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "PMC");
   await page.getByTestId("add-PMC-own").click();
@@ -103,77 +103,76 @@ test("criteria 1–6 and 8: Ocean vs Space for the Opposition", async ({ page })
     await page.keyboard.type(t);
   }
   await page.keyboard.press("Escape");
-  expect(await laneLabels(page, "PMC")).toEqual(["PM1", "PM2", "PM3", "PM4", "PM5"]);
-  await page.getByTestId("add-LOC-clash").click();
-  for (const [i, t] of ["Unexplored is not more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Treaties limit militarisation"].entries()) {
-    if (i > 0) await page.keyboard.press("Enter");
-    await page.keyboard.type(t);
-  }
   await page.keyboard.press("Escape");
-  expect(await laneLabels(page, "LOC")).toEqual(["OC1", "OC2", "OC3", "OC4", "OA1", "OA2", "OA3", "OA4", "OA5", "OA6"]);
+  expect(await laneLabels(page, "PMC")).toEqual(["PM1", "PM2", "PM3", "PM4", "PM5"]);
+  expect(await laneLabels(page, "LOC")).toEqual(["OC1", "OC2", "OC3", "OC4", "OC5", "OA1", "OA2", "OA3", "OA4", "OA5", "OA6"]);
+  for (const [i, t] of ["Unexplored is not more valuable", "Satellites already watch the ocean", "Ignores spin-offs", "Food security is solved on land"].entries()) {
+    await card(page, `OC${i + 1}`).dblclick();
+    await typeAndEscape(page, t);
+    await page.keyboard.press("Escape");
+  }
   await page.keyboard.press("]"); // hotkey: next stage
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "LOC");
-  // PM numbers are locked now, LO's are still live: insert a response at the top, then remove it
-  await page.getByTestId("gap-before-OC1").click();
-  await page.keyboard.type("x");
-  await page.keyboard.press("Escape");
-  await expect(card(page, "OC1")).toContainText("x");
-  await expect(card(page, "OC5")).toContainText("Treaties limit militarisation");
+  // PM numbers are locked now, LO's are still live: a new response (unlinked) comes after the slots
+  await page.getByTestId("add-LOC-clash").click();
+  await typeAndEscape(page, "x");
+  await expect(card(page, "OC6")).toContainText("x");
   await page.keyboard.press("Delete");
-  await expect(card(page, "OC4")).toContainText("Treaties limit militarisation");
+  await expect(card(page, "OC6")).toHaveCount(0);
 
-  // ---------- 3. LOC: speech mode (role LO); click strikes; counter said 7 / 10 ----------
-  await expect(page.getByTestId("speech-mode")).toHaveAttribute("aria-pressed", "true");
-  for (const l of ["OC1", "OC2", "OC3", "OA1", "OA3", "OA5"]) await card(page, l).click();
+  // ---------- 3. LOC: "Made" strikes the card (button or M); counter said 7 / 10 (empty slots not counted) ----------
+  await expect(page.getByTestId("speech-mode")).toHaveCount(0); // speech mode is hidden for now
+  for (const l of ["OC1", "OC2", "OC3", "OA1", "OA3", "OA5"]) await card(page, l).getByTestId("made").click();
   await expect(card(page, "OC3")).toHaveAttribute("data-struck", "true");
-  // a second tap un-says; the selection then moves to the next card
-  await card(page, "OC3").click();
+  await card(page, "OC3").getByTestId("made").click();
   await expect(card(page, "OC3")).toHaveAttribute("data-struck", "false");
-  // keyboard: ↑ back to OC3, Space = said (selection moves on), Space again for OC4
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Space");
-  await expect(card(page, "OC3")).toHaveAttribute("data-struck", "true");
-  await page.keyboard.press("Space");
+  await card(page, "OC3").getByTestId("made").click();
+  await page.keyboard.press("Escape");
+  await card(page, "OC4").click();
+  await page.keyboard.press("m");
   await expect(card(page, "OC4")).toHaveAttribute("data-struck", "true");
+  await expect(card(page, "OC4").getByTestId("made")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("counter-LOC")).toHaveText(/said\s*7 \/ 10/);
   for (const l of ["OA2", "OA4", "OA6"]) await expect(card(page, l)).toHaveAttribute("data-struck", "false");
   await expect(card(page, "OA1").getByTestId("card-text")).toHaveCSS("text-decoration-line", "line-through");
 
   // ---------- 4. LOC → MG: LO numbers locked; unsaid OA2, OA4, OA6 move to MO with "from LO" ----------
+  // PM5's empty answer slot moves on too (unlocked, no plate): a long arrow from MO to PM5
   await page.getByTestId("stage-next").click();
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "MG");
-  expect(await laneLabels(page, "MO")).toEqual(["OA2", "OA4", "OA6"]);
+  expect(await laneLabels(page, "MO")).toEqual(["OC5", "OA2", "OA4", "OA6"]);
   for (const l of ["OA2", "OA4", "OA6"]) await expect(card(page, l).getByTestId("plate-from")).toHaveText("from LO");
+  await expect(card(page, "OC5").getByTestId("plate-from")).toHaveCount(0);
+  await expect(page.getByTestId("arrow-OC5-PM5")).toHaveAttribute("data-blank", "true");
   expect(await laneLabels(page, "LOC")).toEqual(["OC1", "OC2", "OC3", "OC4", "OA1", "OA3", "OA5"]);
   await expect(card(page, "OA2")).toContainText("Planetary backup for humanity");
 
-  // ---------- 5. MG + MO: new answer OC5, new own argument OA7; strike + counter ----------
+  // ---------- 5. MG + MO: answer to MG1 is OC5 (MG answers first), new own argument OA7; Made + counter ----------
   await page.getByTestId("add-MG-own").click();
   await page.keyboard.type("Asteroid mining is decades away");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Earth's problems come first");
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
   expect(await laneLabels(page, "MG")).toEqual(["MG1", "MG2"]);
-  await page.getByTestId("add-MO-clash").click();
+  await card(page, "MG1").click();
+  await page.keyboard.press("r"); // fills MG1's empty slot in MO
   await typeAndEscape(page, "Decades away is still a payoff");
   await expect(card(page, "OC5")).toContainText("Decades away is still a payoff");
   await page.getByTestId("add-MO-own-t1").click();
   await typeAndEscape(page, "Space inspires STEM careers");
   await expect(card(page, "OA7")).toContainText("Space inspires STEM careers");
+  await page.keyboard.press("Escape");
   await page.keyboard.press("]");
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "MO");
-  // this device is LO, so speech mode is off for MO; the partner switches it on by hand (M)
-  await expect(page.getByTestId("speech-mode")).toHaveAttribute("aria-pressed", "false");
-  await page.keyboard.press("m");
-  await expect(page.getByTestId("speech-mode")).toHaveAttribute("aria-pressed", "true");
-  await card(page, "OC5").click();
-  await card(page, "OA2").click();
+  await card(page, "OC5").getByTestId("made").click();
+  await card(page, "OA2").getByTestId("made").click();
   await expect(card(page, "OC5")).toHaveAttribute("data-struck", "true");
   await expect(page.getByTestId("counter-MO")).toHaveText(/said\s*2 \/ 5/);
+  await page.keyboard.press("Escape");
 
   // ---------- 6. LOR: strikes cleared, unsaid red, POO available, OR renumbering ----------
   // POO is not offered before the rebuttals
-  await page.getByTestId("speech-mode").click();
   await card(page, "PM1").click();
   await card(page, "PM1").getByTestId("tool-tags").click();
   await expect(page.getByTestId("tag-menu")).toBeVisible();
@@ -204,18 +203,23 @@ test("criteria 1–6 and 8: Ocean vs Space for the Opposition", async ({ page })
   await card(page, "MG1").getByTestId("tool-tags").click();
   await page.getByTestId("menu-tag-poo").click();
   await expect(card(page, "MG1").getByTestId("tag-poo")).toBeVisible();
-  // OR cards; inserting at the top renumbers
+  // OR cards: the rebuttal points of every made argument are there already (in their rows); new ones come
+  // after them, and inserting at the top of the new ones renumbers
+  const slots = (await laneLabels(page, "LOR")).length;
+  expect(slots).toBeGreaterThan(5);
+  await page.keyboard.press("Escape");
   await page.getByTestId("add-LOR-clash").click();
   await page.keyboard.type("They dropped asteroid mining");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Long term beats short term");
   await page.keyboard.press("Escape");
-  expect(await laneLabels(page, "LOR")).toEqual(["OR1", "OR2"]);
-  await page.getByTestId("gap-before-OR1").click();
+  const n = (k: number) => `OR${slots + k}`;
+  expect((await laneLabels(page, "LOR")).slice(slots)).toEqual([n(1), n(2)]);
+  await page.getByTestId(`gap-before-${n(1)}`).click();
   await typeAndEscape(page, "Opening crystallisation");
-  expect(await laneLabels(page, "LOR")).toEqual(["OR1", "OR2", "OR3"]);
-  await expect(card(page, "OR1")).toContainText("Opening crystallisation");
-  await expect(card(page, "OR3")).toContainText("Long term beats short term");
+  expect((await laneLabels(page, "LOR")).slice(slots)).toEqual([n(1), n(2), n(3)]);
+  await expect(card(page, n(1))).toContainText("Opening crystallisation");
+  await expect(card(page, n(3))).toContainText("Long term beats short term");
   // PMR: no red for the Opposition
   await page.keyboard.press("]");
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "PMR");
@@ -232,8 +236,10 @@ test("criterion 8: every card action by mouse and by hotkey, with visible hotkey
   await page.keyboard.press("Enter");
   await page.keyboard.type("Ocean is cheaper");
   await page.keyboard.press("Escape");
-  await page.getByTestId("add-LOC-clash").click();
+  await page.keyboard.press("Escape");
+  await card(page, "OC1").dblclick(); // PM1's empty answer slot
   await typeAndEscape(page, "Unexplored is not more valuable");
+  await page.keyboard.press("Escape");
 
   // hints: hovering a tool shows its name and hotkey
   await card(page, "PM2").hover();
@@ -273,24 +279,27 @@ test("criterion 8: every card action by mouse and by hotkey, with visible hotkey
   await page.getByTestId("menu-tag-turn").click();
   await expect(card(page, "PM1").getByTestId("tag-turn")).toBeVisible();
 
-  // said: Cmd/Ctrl+Enter outside speech mode, and the ✓ tool
+  // made (said): Cmd/Ctrl+Enter, the ✓ tool and the Made button
   await goStage(page, "LOC");
-  await page.getByTestId("speech-mode").click(); // off
   await card(page, "OC1").click();
   await page.keyboard.press(`${MOD}+Enter`);
   await expect(card(page, "OC1")).toHaveAttribute("data-said", "true");
   await card(page, "OC1").getByTestId("tool-said").click();
   await expect(card(page, "OC1")).toHaveAttribute("data-said", "false");
+  await card(page, "OC1").getByTestId("made").hover();
+  await expect(page.getByRole("tooltip").locator("kbd")).toContainText("M");
 
   // new card: A (below the selected one — OC1 is still selected) and Enter while typing; delete: Del and ✕
   await expect(card(page, "OC1")).toHaveClass(/card--selected/);
   await page.keyboard.press("a");
   await typeAndEscape(page, "Second response");
-  await expect(card(page, "OC2")).toContainText("Second response");
-  await card(page, "OC2").getByTestId("tool-delete").click();
-  await expect(card(page, "OC2")).toHaveCount(0);
+  await expect(card(page, "OC4")).toContainText("Second response"); // unlinked: after the PM answer slots
+  await card(page, "OC4").getByTestId("tool-delete").click();
+  await expect(card(page, "OC4")).toHaveCount(0);
 
-  // edit: Enter on the selected card (the selection moved to OC1 after the delete); Esc leaves editing
+  // edit: Enter on the selected card; Esc leaves editing
+  await page.keyboard.press("Escape");
+  await card(page, "OC1").click();
   await expect(card(page, "OC1")).toHaveClass(/card--selected/);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("card-editor")).toBeFocused();
@@ -345,7 +354,7 @@ test("criterion 7: the same round for the Government gives GA / GC / GR", async 
   await page.keyboard.press("Escape");
   expect(await laneLabels(page, "PMC")).toEqual(["GA1", "GA2"]);
   await goStage(page, "PMC");
-  await card(page, "GA1").click(); // speech mode for PM
+  await card(page, "GA1").getByTestId("made").click();
   await page.keyboard.press("]");
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "LOC");
   expect(await laneLabels(page, "MG")).toEqual(["GA2"]);
@@ -353,14 +362,18 @@ test("criterion 7: the same round for the Government gives GA / GC / GR", async 
   await page.getByTestId("add-LOC-own").click();
   await typeAndEscape(page, "Space pays off long term");
   expect(await laneLabels(page, "LOC")).toEqual(["LO1"]);
-  await page.getByTestId("add-MG-clash").click();
+  // LO1 got an empty answer slot in MG (GC1): fill it
+  await page.keyboard.press("Escape");
+  await card(page, "GC1").dblclick();
   await typeAndEscape(page, "Long term is speculative");
-  await expect(card(page, "GC1")).toBeVisible();
+  await expect(card(page, "GC1")).toContainText("Long term is speculative");
   await goStage(page, "PMR");
   await page.getByTestId("add-PMR-clash").click();
   await typeAndEscape(page, "Answer to MO's new STEM point");
-  await expect(card(page, "GR1")).toBeVisible();
-  await expect(card(page, "GR1")).toHaveAttribute("data-red", "false");
+  const gr = (await laneLabels(page, "PMR")).at(-1)!;
+  expect(gr).toMatch(/^GR\d+$/);
+  await expect(card(page, gr)).toContainText("Answer to MO's new STEM point");
+  await expect(card(page, gr)).toHaveAttribute("data-red", "false");
   await expect(card(page, "GA2")).toHaveAttribute("data-red", "true");
   await expect(card(page, "GC1")).toHaveAttribute("data-red", "true");
   await expect(card(page, "GA1")).toHaveAttribute("data-red", "false");
@@ -382,7 +395,7 @@ test("criterion 9: two devices see stage, cards and strike-throughs in sync", as
   // stage from B, strike from A
   await b.page.getByTestId("stage-LOC").click();
   await expect(a.page.getByTestId("stagebar")).toHaveAttribute("data-stage", "LOC");
-  await card(a.page, "OC1").click(); // A is LO: speech mode on
+  await card(a.page, "OC1").getByTestId("made").click();
   await expect(card(b.page, "OC1")).toHaveAttribute("data-struck", "true");
   await expect(b.page.getByTestId("counter-LOC")).toHaveText(/said\s*1 \/ 2/);
   // carry-over is visible on both
@@ -449,11 +462,11 @@ test("touch: on a tablet the main actions work by tapping", async ({ browser }) 
   await card(page, "PM1").tap();
   await expect(page.getByTestId("card-editor")).toBeVisible();
   await background();
-  // speech mode: tap = said
+  // Made by tapping (PM1's empty answer slot is OC1 now; the earlier response became OC2)
   await page.getByTestId("stage-next").tap();
-  await expect(page.getByTestId("speech-mode")).toHaveAttribute("aria-pressed", "true");
-  await card(page, "OC1").tap();
-  await expect(card(page, "OC1")).toHaveAttribute("data-struck", "true");
+  await expect(card(page, "OC2")).toContainText("Unexplored is not more valuable");
+  await card(page, "OC2").getByTestId("made").tap();
+  await expect(card(page, "OC2")).toHaveAttribute("data-struck", "true");
   await expect(page.getByTestId("counter-LOC")).toHaveText(/said\s*1 \/ 1/);
   // command palette from the top bar
   await page.getByTestId("open-palette").tap();

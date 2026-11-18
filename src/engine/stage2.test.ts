@@ -164,7 +164,7 @@ describe("rows (layoutRows)", () => {
     expect(s.rows().rows[s.row(a2)].cells.get("LOC")).toBeUndefined();
     expect(s.rows().rows[s.row(a2)].cells.get("MO")).toEqual([a2]);
     // unsaid answers carried along stay beside their PM targets; PM4's empty slot moved on unlocked (OC5)
-    expect(s.col("MO").slice(0, 6)).toEqual(["OC1", "OC2", "OC3", "OC5", "OC4", "OA2"]);
+    expect(s.col("MO").slice(0, 6)).toEqual(["OC1", "OC2", "OC3", "OC6", "OC5", "OA2"]); // LO kept OC5 for PM5; the empty slot is OC6
     expect(a6).toBeTruthy();
     expect(s.card$(blank4)).toMatchObject({ ownerSpeech: "MO", carriedFrom: "LOC", numberLocked: false });
     expect(s.board().cards.get(blank4)!.fromLabel).toBeNull();
@@ -210,10 +210,11 @@ describe("rows (layoutRows)", () => {
 
   it("MO numbers answers MG first (MG1, MG2's slot), then what is left from PM (PM4)", () => {
     const { s, oc5, oc6, mg2 } = mgmo();
-    expect(s.label(oc5)).toBe("OC5");
+    // LO locked OC1–OC5 as said (PM4's empty OC4 left a gap), so MO goes on from OC6
+    expect(s.label(oc5)).toBe("OC6");
     const mg2slot = s.state.cards.find((c) => c.respondsTo[0] === mg2)!.id;
-    expect(s.label(mg2slot)).toBe("OC6");
-    expect(s.label(oc6)).toBe("OC7");
+    expect(s.label(mg2slot)).toBe("OC7");
+    expect(s.label(oc6)).toBe("OC8");
     // on screen OC6 (PM4's row) is above OC5 (OA1's row)
     expect(s.row(oc6)).toBeLessThan(s.row(oc5));
   });

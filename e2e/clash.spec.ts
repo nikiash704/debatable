@@ -150,7 +150,11 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   // ---------- 3. Answer (R) and Link (L) ----------
   await pmcWithAnswers(pa);
   expect(await laneLabels(pa, "PMC")).toEqual(["PM1", "PM2", "PM3", "PM4", "PM5"]);
-  for (const [oc, pm] of [["OC1", "PM1"], ["OC2", "PM2"], ["OC3", "PM3"], ["OC4", "PM5"]]) {
+  // every PM card has its LO answer slot with an arrow; PM4's (OC4) is still empty
+  await expect(pa.getByTestId("arrow-OC4-PM4")).toHaveAttribute("data-blank", "true");
+  await expect(card(pa, "OC4")).toHaveClass(/card--blank/);
+  expect(await top(pa, "OC4")).toBe(await top(pa, "PM4"));
+  for (const [oc, pm] of [["OC1", "PM1"], ["OC2", "PM2"], ["OC3", "PM3"], ["OC5", "PM5"]]) {
     await expect(lane(pa, "LOC").locator(`[data-label="${oc}"]`)).toHaveCount(1);
     expect(await top(pa, oc)).toBe(await top(pa, pm));
     await expect(pa.getByTestId(`arrow-${oc}-${pm}`)).toHaveCount(1);
@@ -165,9 +169,7 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   await expect(card(pa, "PM4")).toHaveAttribute("data-unanswered", "true");
   await expect(card(pa, "PM4")).toHaveClass(/card--unanswered/);
   await expect(card(pa, "PM1")).toHaveAttribute("data-unanswered", "false");
-  // LO's lane is empty in PM4's row
-  const pm4Top = await top(pa, "PM4");
-  for (const l of await laneLabels(pa, "LOC")) expect(await top(pa, l)).not.toBe(pm4Top);
+  // an empty slot is not an answer
   await expect(pa.getByTestId("answer-counter-LOC")).toHaveText("PM answered 4/5");
   await expect(pa.getByTestId("unanswered-count")).toHaveText("1 unanswered");
   await expect(pa.getByTestId("unanswered-pill")).toContainText("PM4");
@@ -176,7 +178,8 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   await expect(card(pa, "PM4")).toHaveClass(/card--selected/);
   await expect(card(pa, "PM4")).toBeInViewport();
   // 11: the partner sees links, arrows, unanswered state and counters
-  await expect(b.page.getByTestId("arrow-OC4-PM5")).toHaveCount(1);
+  await expect(b.page.getByTestId("arrow-OC5-PM5")).toHaveCount(1);
+  await expect(b.page.getByTestId("arrow-OC4-PM4")).toHaveCount(1);
   await expect(card(b.page, "PM4")).toHaveAttribute("data-unanswered", "true");
   await expect(b.page.getByTestId("answer-counter-LOC")).toHaveText("PM answered 4/5");
   await expect(b.page.getByTestId("unanswered-pill")).toContainText("PM4");
@@ -205,7 +208,7 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   await expect(b.page.locator('[data-testid^="arrow-OC3-"]')).toHaveCount(1);
 
   // ---------- 6. Focus (this device only) ----------
-  await card(pa, "OC4").dblclick();
+  await card(pa, "OC5").dblclick();
   await expect(pa.getByTestId("card-editor")).toBeFocused();
   await expect(card(pa, "PM5")).toHaveAttribute("data-focus", "true");
   await expect(card(pa, "PM1")).toHaveAttribute("data-focus", "false");
@@ -217,38 +220,48 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   for (const s of ["MG", "MO", "LOR"]) expect(await laneDim(pa, s)).toBe("false");
 
   // ---------- 7. MG / MO ----------
-  await pa.keyboard.press("]"); // LOC: speech mode for LO
+  await pa.keyboard.press("]"); // LOC
   await expect(pa.getByTestId("stagebar")).toHaveAttribute("data-stage", "LOC");
-  for (const l of ["OC1", "OC2", "OC3", "OC4", "OA1", "OA3", "OA5"]) await card(pa, l).click();
+  for (const l of ["OC1", "OC2", "OC3", "OC5", "OA1", "OA3", "OA5"]) await card(pa, l).getByTestId("made").click();
+  await pa.keyboard.press("Escape");
   await pa.keyboard.press("]");
   await expect(pa.getByTestId("stagebar")).toHaveAttribute("data-stage", "MG");
+  // PM4's empty slot moved on to MO; LO keeps the numbers said in LOC (OC4 is a gap now)
+  await expect(card(pa, "OC5")).toContainText("Treaties limit militarisation");
+  await expect(lane(pa, "LOC").locator('[data-label="OC4"]')).toHaveCount(0);
   await card(pa, "OA1").click();
   await pa.keyboard.press("r");
   await typeAndEscape(pa, "Asteroid mining is decades away");
+  await pa.keyboard.press("Escape");
   await expect(lane(pa, "MG").locator('[data-label="MG1"]')).toHaveCount(1);
   expect(await top(pa, "MG1")).toBe(await top(pa, "OA1"));
   await pa.getByTestId("add-MG-own").click();
   await typeAndEscape(pa, "Earth's problems come first");
+  await pa.keyboard.press("Escape");
   const mg2Top = await top(pa, "MG2");
   for (const l of [...(await laneLabels(pa, "PMC")), ...(await laneLabels(pa, "LOC"))]) expect(await top(pa, l)).not.toBe(mg2Top);
   await card(pa, "MG1").click();
   await pa.keyboard.press("r");
   await typeAndEscape(pa, "Decades away is still a payoff");
-  await expect(lane(pa, "MO").locator('[data-label="OC5"]')).toHaveCount(1);
-  expect(await top(pa, "OC5")).toBe(await top(pa, "OA1"));
+  await pa.keyboard.press("Escape");
+  await expect(lane(pa, "MO").locator('[data-label="OC6"]')).toHaveCount(1);
+  expect(await top(pa, "OC6")).toBe(await top(pa, "OA1"));
   await card(pa, "PM4").click();
   await pa.keyboard.press("r");
   await typeAndEscape(pa, "Food security is solved on land");
-  await expect(lane(pa, "MO").locator('[data-label="OC6"]')).toHaveCount(1);
-  expect(await top(pa, "OC6")).toBe(await top(pa, "PM4"));
+  await pa.keyboard.press("Escape");
+  // R filled the slot that moved to MO (MG answers are numbered first: OC6 → MG1, OC7 = MG2's slot)
+  await expect(lane(pa, "MO").locator('[data-label="OC8"]')).toHaveCount(1);
+  await expect(card(pa, "OC8")).toContainText("Food security is solved on land");
+  expect(await top(pa, "OC8")).toBe(await top(pa, "PM4"));
   // a straight arrow from MO across LO and MG to PM4
-  const line = pa.getByTestId("arrow-OC6-PM4").locator(".arrow__line");
+  const line = pa.getByTestId("arrow-OC8-PM4").locator(".arrow__line");
   const [y1, y2, x1, x2] = await Promise.all(["y1", "y2", "x1", "x2"].map(async (k) => Number(await line.getAttribute(k))));
   expect(Math.abs(y1 - y2)).toBeLessThan(1);
   const loBox = (await lane(pa, "LOC").boundingBox())!;
   const mgBox = (await lane(pa, "MG").boundingBox())!;
   const pmBox = (await card(pa, "PM4").boundingBox())!;
-  const moBox = (await card(pa, "OC6").boundingBox())!;
+  const moBox = (await card(pa, "OC8").boundingBox())!;
   expect(x2 - x1).toBeLessThan(0); // drawn from the answer (right) to the target (left)
   expect(moBox.x - pmBox.x - pmBox.width).toBeGreaterThan(loBox.width + mgBox.width);
   await expect(pa.getByTestId("answer-counter-MO")).toHaveText("MG answered 1/2 · from PM left 0");
@@ -257,26 +270,41 @@ test("criteria 3–8 and 11: Answer, Link, unanswered, two targets, focus, MG / 
   await expect(b.page.getByTestId("answer-counter-MO")).toHaveText("MG answered 1/2 · from PM left 0");
 
   // ---------- 8. LOR ----------
-  await pa.keyboard.press("]"); // MO
-  await card(pa, "OC5").click();
-  await pa.keyboard.press(`${MOD}+Enter`);
+  await pa.keyboard.press("]"); // MO: LOR opens with a rebuttal-point slot in the row of every made argument
+  await expect(pa.getByTestId("stagebar")).toHaveAttribute("data-stage", "MO");
+  const extOf = (l: string) => pa.locator(`[data-kind="extend"][data-testid$="-${l}"]`);
+  await expect(extOf("OA1")).toHaveCount(1);
+  await expect(extOf("OC6")).toHaveCount(0);
+  await card(pa, "OC6").click();
+  await pa.keyboard.press(`${MOD}+Enter`); // made in MO → its rebuttal point appears at once
+  await expect(extOf("OC6")).toHaveCount(1);
+  // OA1 and OC6 share a row: their two LOR points stack at the top of that row; OC6's arrow goes diagonally
+  const extOA1 = (await extOf("OA1").getAttribute("data-testid"))!.split("-")[1];
+  const extOC6 = (await extOf("OC6").getAttribute("data-testid"))!.split("-")[1];
+  expect(await top(pa, extOA1)).toBe(await top(pa, "OA1"));
+  expect(await top(pa, extOC6)).toBeGreaterThan(await top(pa, extOA1));
+  const dl = extOf("OC6").locator(".arrow__line");
+  expect(Number(await dl.getAttribute("y2"))).toBeGreaterThan(Number(await dl.getAttribute("y1")) + 20);
+  expect(Number(await dl.getAttribute("x2"))).toBeGreaterThan(Number(await dl.getAttribute("x1")));
+  await pa.keyboard.press("Escape");
   await card(pa, "OA2").click();
   await pa.keyboard.press(`${MOD}+Enter`);
   await pa.keyboard.press("]"); // LOR
   await expect(pa.getByTestId("stagebar")).toHaveAttribute("data-stage", "LOR");
-  for (const [l, where] of [["OA1", "LOC"], ["OC1", "LOC"], ["OC4", "LOC"], ["OC5", "MO"], ["OA2", "MO"]]) {
+  for (const [l, where] of [["OA1", "LOC"], ["OC1", "LOC"], ["OC5", "LOC"], ["OC6", "MO"], ["OA2", "MO"]]) {
     await expect(card(pa, l)).toHaveAttribute("data-said-green", "true");
     await expect(card(pa, l)).toHaveClass(/card--said/);
     await expect(card(pa, l).getByTestId("card-meta")).toHaveText(`said in ${where}`);
     await expect(card(pa, l)).toHaveAttribute("data-struck", "false");
   }
-  for (const l of ["OA4", "OA6", "OC6"]) {
+  for (const l of ["OA4", "OA6", "OC8"]) {
     await expect(card(pa, l)).toHaveAttribute("data-red", "true");
     await expect(card(pa, l).getByTestId("plate-new")).toHaveText("new — don't say");
   }
   // every arrow stays visible
   const arrows = pa.locator('[data-testid^="arrow-"]:not([data-testid^="arrow-hit-"])');
-  await expect(arrows).toHaveCount(7);
+  await expect(pa.locator('[data-kind="answer"]')).toHaveCount(8); // 7 answers + MG2's empty slot, moved to LOR
+  await expect(pa.locator('[data-kind="extend"]')).toHaveCount(9); // made in LOC: 7, in MO: 2
   for (const g of await arrows.all()) await expect(g).not.toHaveCSS("display", "none");
   // PMR cards are never counted as unanswered
   await pa.keyboard.press("]");
@@ -299,7 +327,7 @@ test("criterion 10: the Government mirror gives GA / GC / GR; LO's cards are red
   await page.keyboard.press("Enter");
   await typeAndEscape(page, "Climate answers are in the ocean");
   await page.getByTestId("stage-next").click(); // PMC
-  await card(page, "GA1").click(); // speech mode (PM): said
+  await card(page, "GA1").getByTestId("made").click();
   await page.getByTestId("stage-next").click(); // LOC
   await page.getByTestId("add-LOC-own").click();
   await page.keyboard.type("Space pays off long term");
@@ -311,16 +339,20 @@ test("criterion 10: the Government mirror gives GA / GC / GR; LO's cards are red
   await card(page, "LO2").click();
   await page.keyboard.press("r"); // MG (ours) is live from LOC
   await typeAndEscape(page, "Unexplored means unknown upside");
-  await expect(lane(page, "MG").locator('[data-label="GC1"]')).toHaveCount(1);
-  expect(await top(page, "GC1")).toBe(await top(page, "LO2"));
+  // LO1 and LO2 got empty GC slots in MG at once (GC1, GC2); R filled LO2's
+  await expect(card(page, "GC2")).toContainText("Unexplored means unknown upside");
+  expect(await top(page, "GC2")).toBe(await top(page, "LO2"));
+  await expect(card(page, "GC1")).toHaveClass(/card--blank/);
   await expect(card(page, "LO2")).toHaveAttribute("data-unanswered", "false");
   await expect(card(page, "LO1")).toHaveAttribute("data-unanswered", "true");
   await expect(page.getByTestId("answer-counter-MG")).toHaveText("LO answered 1/2");
   await page.getByTestId("stage-PMR").click();
+  await page.keyboard.press("Escape");
   await card(page, "LO1").click();
-  await page.keyboard.press("r");
+  await page.keyboard.press("r"); // LO1's empty slot moved from MG to PMR at MG → MO
   await typeAndEscape(page, "Long term is speculative");
-  await expect(card(page, "GR1")).toBeVisible();
+  const gr = lane(page, "PMR").locator('[data-testid="card"]', { hasText: "Long term is speculative" });
+  await expect(gr).toHaveAttribute("data-label", /^GR\d+$/);
   await expect(card(page, "LO1")).toHaveAttribute("data-unanswered", "false");
   await expect(page.getByTestId("unanswered-pill")).toHaveCount(0);
 });
@@ -432,7 +464,7 @@ test("criterion 9: drag and drop — step aside, renumber on drop, touch, Alt+�
   await expect(card(page, "OA2")).toContainText("Asteroid mining");
   await expect(lane(b.page, "LOC").getByTestId("thesis-title")).toHaveText([OUTLINE[1].thesis, OUTLINE[0].thesis, OUTLINE[2].thesis]);
 
-  // a linked answer moves only inside its row: dropped elsewhere it snaps back with a hint
+  // a linked answer dragged into another row answers the argument on its left there
   await page.getByTestId("stage-next").click(); // PMC
   await page.getByTestId("add-PMC-own").click();
   await page.keyboard.type("Oceans are 95% unexplored");
@@ -444,18 +476,24 @@ test("criterion 9: drag and drop — step aside, renumber on drop, touch, Alt+�
   await typeAndEscape(page, "Unexplored is not more valuable");
   await page.keyboard.press("Escape");
   const oc1 = (await card(page, "OC1").boundingBox())!;
-  await mouseDrag(page, { x: oc1.x + 60, y: oc1.y + 45 }, { x: oc1.x + 60, y: oc1.y + 420 });
-  await expect(page.getByTestId("toast-text")).toHaveText("Use L to change the target");
+  const pm2 = (await card(page, "PM2").boundingBox())!;
+  await mouseDrag(page, { x: oc1.x + 60, y: oc1.y + 45 }, { x: oc1.x + 60, y: pm2.y + 4 });
+  const answerText = lane(page, "LOC").locator('[data-testid="card"]', { hasText: "Unexplored is not more valuable" });
+  await expect(answerText).toHaveAttribute("data-label", "OC2");
+  expect(await top(page, "OC2")).toBe(await top(page, "PM2"));
+  await expect(page.getByTestId("arrow-OC2-PM2")).toHaveAttribute("data-blank", "false");
+  await expect(page.getByTestId("arrow-OC1-PM1")).toHaveAttribute("data-blank", "true"); // PM2's empty slot moved up
+  await expect(card(b.page, "OC2")).toContainText("Unexplored is not more valuable");
+  // and by keyboard: Alt+↑ moves it back to PM1
+  await card(page, "OC2").click();
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect(answerText).toHaveAttribute("data-label", "OC1");
   expect(await top(page, "OC1")).toBe(await top(page, "PM1"));
-  // and by keyboard: nothing to swap with in its row → the same hint
-  await card(page, "OC1").click();
-  await page.keyboard.press("Alt+ArrowDown");
-  await expect(page.getByTestId("toast-text")).toHaveText("Use L to change the target");
 
   // a locked column: reordering keeps the numbers (LOC → MG locks LO)
   await page.keyboard.press("Escape");
-  await page.keyboard.press("]"); // LOC (speech mode for LO)
-  for (const l of ["OC1", "OA1", "OA2", "OA3", "OA4", "OA5", "OA6"]) await card(page, l).click();
+  await page.keyboard.press("]"); // LOC
+  for (const l of ["OC1", "OA1", "OA2", "OA3", "OA4", "OA5", "OA6"]) await card(page, l).getByTestId("made").click();
   await page.keyboard.press("]"); // MG: LO locked
   await expect(page.getByTestId("stagebar")).toHaveAttribute("data-stage", "MG");
   await page.keyboard.press("Escape");

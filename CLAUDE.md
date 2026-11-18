@@ -43,7 +43,7 @@ the user's decisions are binding, suggestions are not.
 | # | Feature | Status | File |
 |---|---|---|---|
 | 01 | Entry and saving (no login, room codes, live sync, server persistence) | decided for v1 | `docs/features/01-vhod-i-sohranenie.md` |
-| 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | stage 1 built; **stage 2 (clash) built** — its defaults await the user's review (`docs/decisions.md`); stage 3 planned | `docs/features/02-struktura-flou.md` |
+| 02 | Flow structure (cards, theses, stages, numbering, "said", speech mode) — main feature | stage 1 built; **stage 2 (clash) built + reworked after the user's feedback of 18.11** (auto answer slots, LOR rebuttal points, Made button, speech mode hidden) — defaults await review (`docs/decisions.md`); stage 3 planned | `docs/features/02-struktura-flou.md` |
 
 These files are copies of the docs in the claude.ai Project "Debatable"
 (`claude/features/*.md`). When a spec changes in either place, update the other.
@@ -79,7 +79,7 @@ and update the "Tech stack" section of `README.md`.
 - Specs decide behaviour, the design decides the look.
 
 ## Workflow
-- Development branch: `claude/admiring-heisenberg-dhraiy`.
+- Development branch: `claude/debatable-clash-stage-2-u48nve` (earlier: `claude/admiring-heisenberg-dhraiy`).
 - Commit after each working step with a clear message, so any step can be rolled back.
 - Designs: see "Design" above. Progress and next steps: `docs/progress.md`.
 - Keep `docs/decisions.md` current when a decision is made.

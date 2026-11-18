@@ -1,7 +1,7 @@
 # Progress
 
 A fresh session can continue with: "read docs/progress.md and continue".
-Branch: `claude/admiring-heisenberg-dhraiy`. Build order and rules: `CLAUDE.md`.
+Branch: `claude/debatable-clash-stage-2-u48nve` (earlier work: `claude/admiring-heisenberg-dhraiy`). Build order and rules: `CLAUDE.md`.
 Decisions (user's and Claude's defaults): `docs/decisions.md`.
 
 Live app: **https://debatable.nikiash704.workers.dev**
@@ -15,6 +15,7 @@ Live app: **https://debatable.nikiash704.workers.dev**
 | Feature 01 (rooms, codes, sync, offline, persistence) | Done. |
 | Feature 02, stage 1 | Done; 10/10 criteria. |
 | **Feature 02, stage 2 (clash)** | **Done; 13/13 criteria of the stage-2 brief** (see below). Defaults await the user's review: `docs/decisions.md` → "Stage 2 defaults". |
+| Stage 2 feedback (18.11.2026) | Done: automatic answer slots with arrows, long arrows to unanswered gaps, LOR rebuttal points in the arguments' rows (diagonal arrows), Made button, speech mode hidden, drag re-links answers. See `docs/decisions.md` → "User feedback on stage 2". Not deployed yet (no Cloudflare login in this cloud session). |
 | Feature 02, stage 3 | Not started. |
 
 ### Stage 2 milestones
@@ -70,6 +71,13 @@ Live app: **https://debatable.nikiash704.workers.dev**
 SQLite-backed Durable Objects). The laptop is logged in (`wrangler login`); a cloud session needs
 `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" template). Smoke test: `curl <url>/api/health` and
 `E2E_BASE_URL=<url> npx playwright test e2e/rooms.spec.ts -g "two devices"`.
+
+## Tests changed for the 18.11 feedback
+- Engine and e2e tests that made responses with "+" now fill the automatic slots (R or double-click), click
+  Made instead of tapping in speech mode, and expect the shifted numbers (e.g. LOR's own points come after
+  the rebuttal-point slots; MO's first answer is OC6 when LO used OC1–OC5).
+- `e2e/clash.spec.ts`: criterion 3 checks the empty PM4 slot and its dashed arrow; criterion 8 checks the
+  rebuttal points during MO (stacked, diagonal arrow); criterion 9 checks re-linking by drag and Alt+↑.
 
 ## Next
 

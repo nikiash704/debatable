@@ -532,6 +532,10 @@ function CardItem({ vm, col, c, session, peers, focus, drag }: { vm: CardVM; col
         onPointerEnter={() => hoverStore.set(card.id)}
         onPointerLeave={() => hoverStore.set(null)}
         onPointerDown={(e) => drag?.onCardPointerDown(e, card.id)}
+        onMouseDown={(e) => {
+          // while typing in this card, a click on its head ("Responding to…") keeps the caret
+          if ((editingText || editingPoint) && !(e.target as HTMLElement).closest("textarea, button, input")) e.preventDefault();
+        }}
         onClick={(e) => {
           e.stopPropagation();
           if (drag?.consumeClick()) return;
